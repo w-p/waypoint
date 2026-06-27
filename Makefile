@@ -5,6 +5,20 @@
 #
 # DEST is the project root. Defaults to the parent of this directory.
 
+# Run every recipe through a POSIX shell as a single script.
+#
+# On Windows, GNU Make's native port has a "fast path" that executes recipe
+# lines with no shell metacharacters directly via CreateProcess instead of
+# through the shell. Lines like `mkdir -p ...` and `cp src dst` then fail,
+# because mkdir/cp are shell tools, not Windows executables ("CreateProcess(...)
+# failed ... The system cannot find the file specified"). .ONESHELL feeds the
+# whole recipe to $(SHELL) at once, which keeps these POSIX recipes working on
+# Windows (with sh.exe from Git for Windows / MSYS2 / scoop on PATH) while
+# remaining a no-op on Linux and macOS. -e preserves fail-fast error semantics.
+SHELL       := sh
+.ONESHELL:
+.SHELLFLAGS := -ec
+
 DEST        ?= ..
 WP          := $(DEST)/.waypoint
 SKILLS_SRC  := ./skills
