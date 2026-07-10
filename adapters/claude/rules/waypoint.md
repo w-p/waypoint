@@ -1,8 +1,3 @@
----
-description: Waypoint session briefing — reads project context on every session start
-alwaysApply: true
----
-
 # Waypoint Session Briefing
 
 At the start of every new session, before acting on the user's request:

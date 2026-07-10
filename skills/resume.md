@@ -31,7 +31,7 @@ For a new contributor with no prior context, use `onboarding` instead.
 
 Read in order:
 
-1. `.waypoint/memory.md` — most recent entries first; read until you have a clear picture of the current state
+1. `.waypoint/memory/` — most recent session files first (skip `README.md`); read until you have a clear picture of the current state
 2. `.waypoint/project.md` — current phase and active work
 
 ### Step 2 — Read phase-relevant documents if needed
@@ -61,5 +61,5 @@ Once the developer confirms orientation, continue the work. Do not restart from 
 
 ## Notes
 
-- The quality of this skill depends entirely on how well `memory.md` was maintained. If memory is sparse or stale, resume may require reading more documents, effectively falling back to onboarding.
-- After resuming, if significant new context was established during the session, append to `memory.md` before the session ends.
+- The quality of this skill depends entirely on how well `.waypoint/memory/` was maintained. If memory is sparse or stale, resume may require reading more documents, effectively falling back to onboarding.
+- After resuming, if significant new context was established during the session, record it in this session's file under `.waypoint/memory/` before the session ends.

@@ -73,7 +73,7 @@ Waypoint lives in a `.waypoint/` directory at the root of the project repository
   opord.md          Standing orders for the AI assistant
   conops.md         Project intent, scope, and constraints
   project.md        Current phase, shipped/deferred inventory, ground truth index
-  memory.md         Cross-session continuity log
+  memory/           Cross-session continuity log (one file per session)
   design/           Finalized architecture decisions
   plan/             Sequenced work plans
   features/         As-built documentation per shipped feature
@@ -97,7 +97,7 @@ The CONOPS is written only after that conversation has converged. Writing before
 After the CONOPS is written, the developer and agent together:
 - Initialize the OPORD, extending the Waypoint baseline with any project-specific rules
 - Initialize `project.md` to the Ideation phase
-- Initialize `memory.md` with the first dated entry summarizing the project briefing
+- Create the first session file in `memory/` with a dated entry summarizing the project briefing
 
 The project is now ready for structured development.
 
@@ -115,7 +115,7 @@ Define the work: what needs to be done, in what order, and by what roles if rele
 
 **Phase 3 — Execution**
 
-Build, test, and document. The AI works from the approved plan, surfacing blockers or discovered complexity rather than resolving them unilaterally. On completion, the feature is documented in `features/`, `project.md` is updated, and `memory.md` receives a dated entry summarizing what was built and any decisions made during execution.
+Build, test, and document. The AI works from the approved plan, surfacing blockers or discovered complexity rather than resolving them unilaterally. On completion, the feature is documented in `features/`, `project.md` is updated, and the session's file in `memory/` receives a dated entry summarizing what was built and any decisions made during execution.
 
 Phases are sequential. A project in Execution that discovers a significant design gap returns to Ideation for that scope — it does not extend the plan unilaterally.
 
@@ -136,7 +136,7 @@ Each of the following activities is covered by a skill document in `.waypoint/sk
 
 The AI assistant has standing duties that apply continuously across all phases. These are defined in detail in `opord.md` and repeated here for visibility:
 
-- **Memory** — After meaningful changes or conversations, append a dated entry to `memory.md`. Entries are written for a future reader who has lost all prior context. Brief but complete.
+- **Memory** — After meaningful changes or conversations, record a dated entry in the session's file under `memory/` (one file per session). Entries are written for a future reader who has lost all prior context. Brief but complete.
 - **Project state** — Keep `project.md` current: the active phase, what has shipped, what is deferred, and where the ground truth documents are.
 - **Feature documentation** — When a feature is shipped, produce an as-built document in `features/` before closing the work.
 - **Design records** — When a significant architectural decision is made during Ideation, record it in `design/` before advancing.
@@ -152,7 +152,7 @@ On every new session start, the AI reads `opord.md` first. The OPORD tells it wh
 **In scope:**
 
 - The `.waypoint/` directory structure and document conventions
-- Templates for the CONOPS, OPORD, `project.md`, and `memory.md`
+- Templates for the CONOPS, OPORD, `project.md`, and the `memory/` convention
 - Core entry point skill documents
 - The baseline OPORD content and its extension mechanism
 - Thin vendor adapters for common AI development tools

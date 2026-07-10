@@ -69,7 +69,7 @@ After the CONOPS is approved:
 
 1. Copy `templates/opord.md` to `.waypoint/opord.md`. Extend the code standards section with any project-specific conventions discussed during the CONOPS conversation.
 2. Initialize `.waypoint/project.md` from `templates/project.md`. Set the phase to Ideation.
-3. Initialize `.waypoint/memory.md` from `templates/memory.md`. Add the first dated entry summarizing the project briefing.
+3. Create the first session file in `.waypoint/memory/` (named `YYYY-MM-DD-<slug>.md`) with a dated entry summarizing the project briefing. See `.waypoint/memory/README.md` for the convention.
 4. Confirm with the developer that the project is ready to proceed.
 
 ---

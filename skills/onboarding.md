@@ -43,7 +43,7 @@ Depending on the current phase recorded in `project.md`:
 
 ### Step 3 — Read recent memory
 
-Read `.waypoint/memory.md`. Focus on the most recent entries. These capture decisions and context that may not be reflected in the structured documents yet.
+Read the session files in `.waypoint/memory/` (skip `README.md`), most recent first. These capture decisions and context that may not be reflected in the structured documents yet.
 
 ### Step 4 — Confirm understanding
 

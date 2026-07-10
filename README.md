@@ -23,7 +23,7 @@ Waypoint governs **what the AI knows** — project intent, architecture decision
   opord.md          Standing orders for the AI assistant
   conops.md         Project intent, scope, and constraints
   project.md        Current phase, shipped/deferred inventory, ground truth index
-  memory.md         Cross-session continuity log
+  memory/           Cross-session continuity log (one file per session)
   design/           Finalized architecture decisions
   plan/             Sequenced work plans
   features/         As-built documentation per shipped feature
@@ -73,18 +73,26 @@ The agent, primed by the OPORD, will find and follow the `new-project` skill aut
 
 ### 4. Verify
 
-Open a new session. The AI should respond with **"Ready."** — nothing else. If it does, Waypoint is working.
+Open a new session with no request — just a greeting. The AI should respond with **"Ready."** and nothing else. If instead you open with a question, it briefly notes it's coming up to speed and then answers directly. Either way, Waypoint is working.
 
 ### Keeping up to date
 
-When the framework ships new skill or adapter versions:
+When the framework ships new versions:
 
 ```bash
-make -C waypoint update          # Refresh core skills and adapter
+make -C waypoint update          # Migrate layout, refresh skills + adapter, check OPORD drift
 make -C waypoint update-skills   # Core skills only
+make -C waypoint migrate         # Bring an older install up to the current layout only
 ```
 
-User-created skills in `.waypoint/skills/` are never modified by `update`.
+`update` is safe to run repeatedly. It:
+
+- **Migrates layout** — an old single `.waypoint/memory.md` is moved into `.waypoint/memory/` (as a dated `-legacy.md` file); the folder convention is installed. An older adapter that embedded the briefing in `CLAUDE.md` is relocated to `.claude/rules/waypoint.md`, and the stale block is reported for you to remove.
+- **Refreshes core skills** — user-created skills in `.waypoint/skills/` are never touched.
+- **Refreshes the adapter** — both adapters are standalone rule files (`.claude/rules/waypoint.md` and `.cursor/rules/session-briefing.mdc`), replaced wholesale.
+- **Checks the OPORD** — your `.waypoint/opord.md` is yours to extend, so `update` never rewrites it. If the shipped baseline has moved, it prints a `diff` command so you can merge framework changes by hand.
+
+Installing into a project that already has instructions is safe: each adapter is its own file under `.claude/rules/` or `.cursor/rules/`, so Waypoint never edits your `CLAUDE.md` or other rules.
 
 ## Skills reference
 

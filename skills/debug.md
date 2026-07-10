@@ -65,7 +65,7 @@ Apply the minimal fix that addresses the root cause. Verify the original behavio
 
 If the investigation revealed something non-obvious about the system — a surprising behavior, an undocumented constraint, a fragile interaction — record it:
 
-- Add a note to `.waypoint/memory.md`
+- Add a note to this session's file in `.waypoint/memory/`
 - Consider whether a design document in `.waypoint/design/` is warranted
 - Add a code comment at the affected location if the fix would otherwise be confusing
 

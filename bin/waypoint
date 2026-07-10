@@ -1,0 +1,250 @@
+#!/usr/bin/env bash
+#
+# waypoint — install, update, and migrate the Waypoint framework inside a project.
+#
+#   waypoint <command> [dest]
+#
+# Commands:
+#   install-core     Templates and skills only (no editor adapter)
+#   install-claude   install-core + Claude Code adapter (.claude/rules/waypoint.md)
+#   install-cursor   install-core + Cursor adapter (.cursor/rules/session-briefing.mdc)
+#   update           Migrate layout, refresh skills + adapter, report OPORD drift
+#   update-skills    Refresh core skills only
+#   migrate          Bring an older install up to the current on-disk layout
+#
+# dest is the project root. Defaults to the parent of this repository.
+
+set -euo pipefail
+
+# Source locations resolve against this repo, independent of the caller's CWD.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SKILLS_SRC="$ROOT/skills"
+TMPL_SRC="$ROOT/templates"
+ADAPTERS="$ROOT/adapters"
+
+# Core skills shipped by the framework. update/update-skills refresh exactly these;
+# user-authored skills in .waypoint/skills/ are never touched.
+CORE_SKILLS="new-project.md new-feature.md new-skill.md onboarding.md resume.md debug.md"
+
+# ─── Core ────────────────────────────────────────────────────────────────────
+
+install_core() {
+	local dest="$1" wp="$1/.waypoint"
+
+	echo ""
+	echo "→ Creating .waypoint/ directory structure..."
+	mkdir -p "$wp"/design "$wp"/plan "$wp"/features "$wp"/skills "$wp"/memory
+
+	echo ""
+	echo "→ Installing templates..."
+	local f dst
+	for f in opord project; do
+		dst="$wp/$f.md"
+		if [ ! -f "$dst" ]; then
+			cp "$TMPL_SRC/$f.md" "$dst"
+			echo "  + .waypoint/$f.md"
+		else
+			echo "  ~ .waypoint/$f.md  (exists, skipped)"
+		fi
+	done
+
+	# The memory README documents the folder convention; refresh it in place.
+	cp "$TMPL_SRC/memory.md" "$wp/memory/README.md"
+	echo "  ✓ .waypoint/memory/README.md"
+
+	# The CONOPS template is a reference to author from; always keep it current.
+	cp "$TMPL_SRC/conops.md" "$wp/conops-template.md"
+	echo "  ✓ .waypoint/conops-template.md"
+
+	echo ""
+	echo "→ Installing skills..."
+	for f in $CORE_SKILLS; do
+		dst="$wp/skills/$f"
+		if [ ! -f "$dst" ]; then
+			cp "$SKILLS_SRC/$f" "$dst"
+			echo "  + .waypoint/skills/$f"
+		else
+			echo "  ~ .waypoint/skills/$f  (exists, skipped)"
+		fi
+	done
+
+	echo ""
+	echo "  Next: produce your CONOPS. Tell your assistant:"
+	echo "    Read .waypoint/skills/new-project.md and follow it."
+	echo ""
+}
+
+install_claude() {
+	local dest="$1"
+	install_core "$dest"
+	echo "→ Installing Claude Code adapter..."
+	install_claude_rule "$dest"
+	echo "  + .claude/rules/waypoint.md"
+	report_legacy_block "$dest" || true
+	echo ""
+	echo "✓ Done. In a new Claude Code session: no request → 'Ready.';"
+	echo "  a question → it comes up to speed and answers it."
+	echo ""
+}
+
+install_cursor() {
+	local dest="$1"
+	install_core "$dest"
+	echo "→ Installing Cursor adapter..."
+	mkdir -p "$dest/.cursor/rules"
+	cp "$ADAPTERS/cursor/rules/session-briefing.mdc" "$dest/.cursor/rules/session-briefing.mdc"
+	echo "  + .cursor/rules/session-briefing.mdc"
+	echo ""
+	echo "✓ Done. In a new Cursor session: no request → 'Ready.';"
+	echo "  a question → it comes up to speed and answers it."
+	echo ""
+}
+
+# ─── Claude adapter (standalone rule file, like the Cursor adapter) ──────────
+
+# The Claude briefing is a plain rule file that loads every session. Install and
+# update are a wholesale copy — it never touches the project's own CLAUDE.md.
+install_claude_rule() {
+	local dest="$1"
+	mkdir -p "$dest/.claude/rules"
+	cp "$ADAPTERS/claude/rules/waypoint.md" "$dest/.claude/rules/waypoint.md"
+}
+
+# True if a pre-rules install embedded the briefing directly in a CLAUDE.md.
+has_legacy_block() {
+	local dest="$1" f
+	for f in "$dest/CLAUDE.md" "$dest/.claude/CLAUDE.md"; do
+		[ -f "$f" ] && grep -qF "# Waypoint Session Briefing" "$f" && return 0
+	done
+	return 1
+}
+
+# Point out a legacy embedded block so the user can remove it. We never edit
+# their CLAUDE.md automatically. Returns success if a block was found.
+report_legacy_block() {
+	local dest="$1" f rc=1
+	for f in "$dest/CLAUDE.md" "$dest/.claude/CLAUDE.md"; do
+		if [ -f "$f" ] && grep -qF "# Waypoint Session Briefing" "$f"; then
+			echo "  ! Legacy briefing block in ${f#"$dest"/} is superseded by"
+			echo "    .claude/rules/waypoint.md — remove it to avoid duplicated instructions."
+			rc=0
+		fi
+	done
+	return $rc
+}
+
+# ─── Migration ───────────────────────────────────────────────────────────────
+
+# Bring an existing install up to the current layout. Idempotent.
+migrate() {
+	local dest="$1" wp="$1/.waypoint"
+
+	mkdir -p "$wp"/design "$wp"/plan "$wp"/features "$wp"/skills "$wp"/memory
+
+	# memory.md (single append-file) → memory/ (one file per session).
+	if [ -f "$wp/memory.md" ]; then
+		local legacy="$wp/memory/$(date +%Y-%m-%d)-legacy.md"
+		mv "$wp/memory.md" "$legacy"
+		echo "  ~ memory.md → memory/$(basename "$legacy")"
+	fi
+	cp "$TMPL_SRC/memory.md" "$wp/memory/README.md"
+
+	# Claude adapter relocation: an older install embedded the briefing in a
+	# CLAUDE.md. Adopt the standalone rule file, then flag the old block.
+	if has_legacy_block "$dest" && [ ! -f "$dest/.claude/rules/waypoint.md" ]; then
+		install_claude_rule "$dest"
+		echo "  ~ Claude adapter → .claude/rules/waypoint.md"
+	fi
+	report_legacy_block "$dest" || true
+}
+
+# ─── Update ──────────────────────────────────────────────────────────────────
+
+update_skills() {
+	local dest="$1" wp="$1/.waypoint"
+	if [ ! -d "$wp/skills" ]; then
+		echo "  Error: $wp/skills does not exist. Run install first." >&2
+		exit 1
+	fi
+	echo ""
+	echo "→ Updating core skills..."
+	local f
+	for f in $CORE_SKILLS; do
+		cp "$SKILLS_SRC/$f" "$wp/skills/$f"
+		echo "  ✓ .waypoint/skills/$f"
+	done
+	echo ""
+}
+
+update() {
+	local dest="$1" wp="$1/.waypoint"
+	if [ ! -d "$wp" ]; then
+		echo "  Error: $wp does not exist. Run install first." >&2
+		exit 1
+	fi
+
+	echo ""
+	echo "→ Migrating layout if needed..."
+	migrate "$dest"
+
+	update_skills "$dest"
+
+	echo "→ Updating adapter..."
+	if [ -f "$dest/.cursor/rules/session-briefing.mdc" ]; then
+		cp "$ADAPTERS/cursor/rules/session-briefing.mdc" "$dest/.cursor/rules/session-briefing.mdc"
+		echo "  ✓ .cursor/rules/session-briefing.mdc"
+	fi
+	if [ -f "$dest/.claude/rules/waypoint.md" ]; then
+		install_claude_rule "$dest"
+		echo "  ✓ .claude/rules/waypoint.md"
+	fi
+
+	echo ""
+	echo "→ Checking OPORD baseline..."
+	opord_notice "$dest"
+
+	echo ""
+	echo "✓ Update complete."
+	echo ""
+}
+
+# The OPORD is project-owned once installed (you extend it). We never rewrite it;
+# we only report whether the shipped baseline has moved, and how to compare.
+opord_notice() {
+	local dest="$1" wp="$1/.waypoint"
+	if [ ! -f "$wp/opord.md" ]; then
+		return
+	fi
+	if diff -q "$wp/opord.md" "$TMPL_SRC/opord.md" >/dev/null 2>&1; then
+		echo "  ✓ OPORD matches the shipped baseline — nothing to merge."
+	else
+		echo "  ! OPORD differs from the shipped baseline (expected if you extended it)."
+		echo "    Review framework changes and merge by hand:"
+		echo "      diff \"$wp/opord.md\" \"$TMPL_SRC/opord.md\""
+	fi
+}
+
+# ─── Dispatch ────────────────────────────────────────────────────────────────
+
+cmd="${1:-}"
+dest="${2:-$ROOT/..}"
+
+case "$cmd" in
+	install-core)   install_core "$dest" ;;
+	install-claude) install_claude "$dest" ;;
+	install-cursor) install_cursor "$dest" ;;
+	update)         update "$dest" ;;
+	update-skills)  update_skills "$dest" ;;
+	migrate)
+		echo ""
+		echo "→ Migrating to the current layout..."
+		migrate "$dest"
+		echo ""
+		echo "✓ Migration complete."
+		echo ""
+		;;
+	*)
+		echo "usage: waypoint <install-core|install-claude|install-cursor|update|update-skills|migrate> [dest]" >&2
+		exit 1
+		;;
+esac

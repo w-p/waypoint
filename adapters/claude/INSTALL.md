@@ -2,22 +2,36 @@
 
 ## What this does
 
-Provides a `CLAUDE.md` file that Claude Code reads automatically at session start. It instructs Claude to run the Waypoint session briefing before processing any request.
+Installs a project rule at `.claude/rules/waypoint.md` that Claude Code loads
+automatically at the start of every session. It instructs Claude to run the
+Waypoint session briefing before acting on a request.
+
+Claude Code loads every `.md` file in `.claude/rules/` (without `paths`
+frontmatter) into context each session, at the same priority as a project
+`CLAUDE.md`. Using a dedicated rule file keeps the briefing separate from — and
+never disturbs — your own `CLAUDE.md`.
 
 ## Installation
 
-Copy `CLAUDE.md` to your project root:
-
 ```bash
-cp path/to/waypoint/adapters/claude/CLAUDE.md .
+mkdir -p .claude/rules
+cp path/to/waypoint/adapters/claude/rules/waypoint.md .claude/rules/waypoint.md
 ```
 
-If your project already has a `CLAUDE.md`, append the contents of this file to it rather than replacing it.
+Or from your project root: `make -C waypoint install-claude`.
+
+This is purely additive: it creates one file and touches nothing else, so it is
+safe alongside an existing `CLAUDE.md` or other rules.
 
 ## Verification
 
-Open a new Claude Code session in the project directory. The first response should be **"Ready."** with no other content.
+Open a new Claude Code session in the project directory. If you open with no
+request, the first response should be **"Ready."** with no other content. If you
+open with a question, the agent briefly notes it's coming up to speed and then
+answers it directly.
 
 ## Updating
 
-If the file changes in a future Waypoint release, re-copy or merge the updated content.
+`make -C waypoint update` re-copies the rule file. If you previously used an
+older Waypoint version that embedded the briefing directly in `CLAUDE.md`, update
+installs the rule file and points out the old block so you can remove it.

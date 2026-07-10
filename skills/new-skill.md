@@ -77,7 +77,7 @@ Optional. Edge cases, caveats, or links to related skills or documents.
 
 Present the draft to the developer. Revise until it accurately reflects the intended procedure. Save the file.
 
-Update `.waypoint/memory.md` with a note that the skill was created.
+Add a note to this session's file in `.waypoint/memory/` that the skill was created.
 
 ---
 

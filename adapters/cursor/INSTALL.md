@@ -17,7 +17,7 @@ That is all. Cursor picks up rules automatically on next session start.
 
 ## Verification
 
-Open a new Cursor agent session. The first response should be **"Ready."** with no other content. If the agent responds with anything else before reading the Waypoint documents, the rule is not active — check that the file is in `.cursor/rules/` and restart Cursor.
+Open a new Cursor agent session with no request. The first response should be **"Ready."** with no other content. (If you open with a question instead, the agent briefly notes it's coming up to speed and then answers it.) If the agent adds unrelated commentary before reading the Waypoint documents, the rule is not active — check that the file is in `.cursor/rules/` and restart Cursor.
 
 ## Updating
 

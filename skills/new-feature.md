@@ -79,7 +79,7 @@ When all tasks are complete:
 
 1. Write an as-built feature document in `.waypoint/features/`. This document records what was built, key implementation decisions, and anything future contributors need to know.
 2. Update `.waypoint/project.md`: add the feature to the Shipped list, update phase if appropriate.
-3. Update `.waypoint/memory.md` with a dated entry summarizing what was built.
+3. Record a dated entry in this session's file under `.waypoint/memory/` summarizing what was built.
 4. Update `CHANGELOG.md` and `README.md` if the change is user-visible.
 
 ---
