@@ -32,27 +32,18 @@ Waypoint governs **what the AI knows** — project intent, architecture decision
 
 ## Getting started
 
-### 1. Add Waypoint to your project
+### 1. Install Waypoint
 
-The recommended approach is a git submodule, cloned into a directory named `waypoint`:
-
-```bash
-git submodule add https://github.com/<org>/waypoint waypoint
-```
-
-Alternatively, clone or copy the repo into your project root as `waypoint/`.
-
-### 2. Install
-
-From your project root:
+Clone into your project root and run the installer:
 
 ```bash
+git clone https://github.com/<org>/waypoint waypoint
 make -C waypoint install
 ```
 
-This auto-detects your tool (Cursor if `.cursor/` exists, otherwise Claude Code), creates the `.waypoint/` directory structure, installs templates and skills, and wires up the session-start adapter.
+This auto-detects your tool (Cursor if `.cursor/` exists, otherwise Claude Code), creates `.waypoint/`, and wires up the session-start adapter. Commit `.waypoint/` and the adapter files; `waypoint/` itself can be deleted afterward — re-clone it whenever you want to run `update`.
 
-To target a specific tool explicitly, or install from a non-standard location:
+To target a specific tool, install core only, or install from a non-standard location:
 
 ```bash
 make -C waypoint install-cursor              # Cursor
@@ -63,7 +54,7 @@ make -C path/to/waypoint install DEST=.      # If not in a subdirectory named wa
 
 Run `make -C waypoint help` to see all available targets and options.
 
-### 3. Produce your CONOPS
+### 2. Produce your CONOPS
 
 Open a session with your AI assistant and say something like:
 
@@ -71,7 +62,7 @@ Open a session with your AI assistant and say something like:
 
 The agent, primed by the OPORD, will find and follow the `new-project` skill automatically. It will ask questions, explore the design space with you, and produce the `conops.md`. Do not write it yourself — the value is in the conversation that produces it.
 
-### 4. Verify
+### 3. Verify
 
 Open a new session with no request — just a greeting. The AI should respond with **"Ready."** and nothing else. If instead you open with a question, it briefly notes it's coming up to speed and then answers directly. Either way, Waypoint is working.
 
