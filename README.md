@@ -34,25 +34,25 @@ Waypoint governs **what the AI knows** — project intent, architecture decision
 
 ### 1. Install Waypoint
 
-Clone into your project root and run the installer:
+Clone it anywhere, `cd` into your project, and run the installer by its path:
 
 ```bash
 git clone https://github.com/<org>/waypoint waypoint
-make -C waypoint install
+cd your-project
+./waypoint/waypoint install
 ```
 
-This auto-detects your tool (Cursor if `.cursor/` exists, otherwise Claude Code), creates `.waypoint/`, and wires up the session-start adapter. Commit `.waypoint/` and the adapter files; `waypoint/` itself can be deleted afterward — re-clone it whenever you want to run `update`.
+The install target is always `pwd`. Installation auto-detects your tool (Cursor if `.cursor/` exists, otherwise Claude Code), creates `.waypoint/`, and wires up the session-start adapter. Commit `.waypoint/` and the adapter files.
 
-To target a specific tool, install core only, or install from a non-standard location:
 
 ```bash
-make -C waypoint install-cursor              # Cursor
-make -C waypoint install-claude              # Claude Code
-make -C waypoint install-core                # Templates and skills only, no adapter
-make -C path/to/waypoint install DEST=.      # If not in a subdirectory named waypoint
+./waypoint/waypoint install-cursor           # Cursor
+./waypoint/waypoint install-claude           # Claude Code
+./waypoint/waypoint install-core             # Templates and skills only, no adapter
+./waypoint/waypoint install /path/to/project # Install to another path
 ```
 
-Run `make -C waypoint help` to see all available targets and options.
+Run `./waypoint/waypoint help` to see all available commands.
 
 ### 2. Produce your CONOPS
 
@@ -71,9 +71,9 @@ Open a new session with no request — just a greeting. The AI should respond wi
 When the framework ships new versions:
 
 ```bash
-make -C waypoint update          # Migrate layout, refresh skills + adapter, check OPORD drift
-make -C waypoint update-skills   # Core skills only
-make -C waypoint migrate         # Bring an older install up to the current layout only
+./waypoint/waypoint update          # Migrate layout, refresh skills + adapter, check OPORD drift
+./waypoint/waypoint update-skills   # Core skills only
+./waypoint/waypoint migrate         # Bring an older install up to the current layout only
 ```
 
 `update` is safe to run repeatedly. It:

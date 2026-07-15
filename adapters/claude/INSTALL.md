@@ -18,8 +18,6 @@ mkdir -p .claude/rules
 cp path/to/waypoint/adapters/claude/rules/waypoint.md .claude/rules/waypoint.md
 ```
 
-Or from your project root: `make -C waypoint install-claude`.
-
 This is purely additive: it creates one file and touches nothing else, so it is
 safe alongside an existing `CLAUDE.md` or other rules.
 
@@ -32,6 +30,6 @@ answers it directly.
 
 ## Updating
 
-`make -C waypoint update` re-copies the rule file. If you previously used an
-older Waypoint version that embedded the briefing directly in `CLAUDE.md`, update
-installs the rule file and points out the old block so you can remove it.
+Re-copy `rules/waypoint.md` to replace the old version. If you previously used an
+older Waypoint version that embedded the briefing directly in `CLAUDE.md`, remove
+that block once the standalone rule file is in place.

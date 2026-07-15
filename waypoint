@@ -2,22 +2,28 @@
 #
 # waypoint — install, update, and migrate the Waypoint framework inside a project.
 #
-#   waypoint <command> [dest]
+# Run from anywhere by whatever path reaches this script; it operates on your
+# current directory by default, so the common case is:
+#
+#   cd your-project
+#   /path/to/waypoint/waypoint install
 #
 # Commands:
+#   install          Auto-detect tool (Cursor if .cursor/ exists, else Claude Code)
 #   install-core     Templates and skills only (no editor adapter)
 #   install-claude   install-core + Claude Code adapter (.claude/rules/waypoint.md)
 #   install-cursor   install-core + Cursor adapter (.cursor/rules/session-briefing.mdc)
 #   update           Migrate layout, refresh skills + adapter, report OPORD drift
 #   update-skills    Refresh core skills only
 #   migrate          Bring an older install up to the current on-disk layout
+#   help             Show this message
 #
-# dest is the project root. Defaults to the parent of this repository.
+# dest is the project root to install/update. Defaults to the current directory.
 
 set -euo pipefail
 
 # Source locations resolve against this repo, independent of the caller's CWD.
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILLS_SRC="$ROOT/skills"
 TMPL_SRC="$ROOT/templates"
 ADAPTERS="$ROOT/adapters"
@@ -72,6 +78,15 @@ install_core() {
 	echo "  Next: produce your CONOPS. Tell your assistant:"
 	echo "    Read .waypoint/skills/new-project.md and follow it."
 	echo ""
+}
+
+install_auto() {
+	local dest="$1"
+	if [ -d "$dest/.cursor" ]; then
+		install_cursor "$dest"
+	else
+		install_claude "$dest"
+	fi
 }
 
 install_claude() {
@@ -224,12 +239,69 @@ opord_notice() {
 	fi
 }
 
+# ─── Usage ───────────────────────────────────────────────────────────────────
+
+usage() {
+	cat <<EOF
+
+  Waypoint
+
+  Commands:
+    install          Auto-detect tool and install
+                      (Cursor if .cursor/ exists, otherwise Claude Code)
+    install-cursor    Install with Cursor adapter
+    install-claude    Install with Claude Code adapter
+    install-core      Install templates and skills only (no adapter)
+
+    update            Migrate layout, refresh skills + adapter, check OPORD drift
+    update-skills     Refresh core skills only
+    migrate           Bring an older install up to the current layout
+
+  Usage:
+    $0 <command> [dest]
+
+    dest is the project root to install/update. Defaults to the current
+    directory — run from anywhere by cd'ing into your project first:
+      cd your-project && $0 install
+
+EOF
+}
+
 # ─── Dispatch ────────────────────────────────────────────────────────────────
 
 cmd="${1:-}"
-dest="${2:-$ROOT/..}"
 
 case "$cmd" in
+	""|help|-h|--help)
+		usage
+		exit 0
+		;;
+esac
+
+dest="${2:-$PWD}"
+
+# Guard against running this from inside the waypoint checkout itself with no
+# explicit dest — dest defaults to your current directory, so if you cd'd into
+# the checkout to look around and then ran a bare command, you'd otherwise
+# silently install waypoint into itself.
+dest="$(cd "$dest" 2>/dev/null && pwd || true)"
+if [ -z "$dest" ]; then
+	echo "Error: destination directory does not exist: ${2:-$PWD}" >&2
+	exit 1
+fi
+case "$dest" in
+	"$ROOT"|"$ROOT"/*)
+		echo "Error: destination ($dest) is inside the waypoint checkout itself ($ROOT)." >&2
+		echo "" >&2
+		echo "dest defaults to your current directory. cd into your project first," >&2
+		echo "or pass its path explicitly:" >&2
+		echo "  $ROOT/waypoint $cmd /path/to/your/project" >&2
+		exit 1
+		;;
+esac
+
+case "$cmd" in
+	install)        install_auto "$dest" ;;
 	install-core)   install_core "$dest" ;;
 	install-claude) install_claude "$dest" ;;
 	install-cursor) install_cursor "$dest" ;;
@@ -244,7 +316,8 @@ case "$cmd" in
 		echo ""
 		;;
 	*)
-		echo "usage: waypoint <install-core|install-claude|install-cursor|update|update-skills|migrate> [dest]" >&2
+		echo "Unknown command: $cmd" >&2
+		usage >&2
 		exit 1
 		;;
 esac
