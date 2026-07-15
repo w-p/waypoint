@@ -6,10 +6,9 @@
 # current directory by default, so the common case is:
 #
 #   cd your-project
-#   /path/to/waypoint/waypoint install
+#   /path/to/waypoint/waypoint install-cursor
 #
 # Commands:
-#   install          Auto-detect tool (Cursor if .cursor/ exists, else Claude Code)
 #   install-core     Templates and skills only (no editor adapter)
 #   install-claude   install-core + Claude Code adapter (.claude/rules/waypoint.md)
 #   install-cursor   install-core + Cursor adapter (.cursor/rules/session-briefing.mdc)
@@ -80,13 +79,19 @@ install_core() {
 	echo ""
 }
 
-install_auto() {
-	local dest="$1"
-	if [ -d "$dest/.cursor" ]; then
-		install_cursor "$dest"
-	else
-		install_claude "$dest"
-	fi
+# There is no reliable way to detect which editor you're using from a shell
+# script — Claude Code and Cursor can both be installed on the same machine,
+# and a fresh project won't have a .cursor/ or .claude/ directory yet either
+# way. Rather than guess (and silently install an adapter for a tool you don't
+# use), require an explicit choice.
+install_ambiguous() {
+	echo "Error: 'install' doesn't know which editor you're using — Claude Code" >&2
+	echo "and Cursor can both be present on the same machine, and there's no" >&2
+	echo "reliable way to detect which one you mean. Choose explicitly:" >&2
+	echo "" >&2
+	echo "  $0 install-cursor" >&2
+	echo "  $0 install-claude" >&2
+	exit 1
 }
 
 install_claude() {
@@ -247,8 +252,6 @@ usage() {
   Waypoint
 
   Commands:
-    install          Auto-detect tool and install
-                      (Cursor if .cursor/ exists, otherwise Claude Code)
     install-cursor    Install with Cursor adapter
     install-claude    Install with Claude Code adapter
     install-core      Install templates and skills only (no adapter)
@@ -262,7 +265,7 @@ usage() {
 
     dest is the project root to install/update. Defaults to the current
     directory — run from anywhere by cd'ing into your project first:
-      cd your-project && $0 install
+      cd your-project && $0 install-cursor
 
 EOF
 }
@@ -301,7 +304,7 @@ case "$dest" in
 esac
 
 case "$cmd" in
-	install)        install_auto "$dest" ;;
+	install)        install_ambiguous ;;
 	install-core)   install_core "$dest" ;;
 	install-claude) install_claude "$dest" ;;
 	install-cursor) install_cursor "$dest" ;;

@@ -34,22 +34,22 @@ Waypoint governs **what the AI knows** — project intent, architecture decision
 
 ### 1. Install Waypoint
 
-Clone it anywhere, `cd` into your project, and run the installer by its path:
+- Clone 
+- `cd` into your project
+- Run the installer from the waypoint directory
+
+The install target is `pwd` unless otherwise specified. It creates `.waypoint/` and wires up the appropriate adapter. Commit `.waypoint/` and the adapter files with your project.
 
 ```bash
 git clone https://github.com/<org>/waypoint waypoint
 cd your-project
-./waypoint/waypoint install
-```
-
-The install target is always `pwd`. Installation auto-detects your tool (Cursor if `.cursor/` exists, otherwise Claude Code), creates `.waypoint/`, and wires up the session-start adapter. Commit `.waypoint/` and the adapter files.
-
-
-```bash
-./waypoint/waypoint install-cursor           # Cursor
-./waypoint/waypoint install-claude           # Claude Code
-./waypoint/waypoint install-core             # Templates and skills only, no adapter
-./waypoint/waypoint install /path/to/project # Install to another path
+./waypoint/waypoint install-cursor    # Cursor
+# or
+./waypoint/waypoint install-claude    # Claude Code
+# or
+./waypoint/waypoint install-core                     # Templates and skills only, no adapter
+# or
+./waypoint/waypoint install-cursor /path/to/project  # Install to another path
 ```
 
 Run `./waypoint/waypoint help` to see all available commands.
