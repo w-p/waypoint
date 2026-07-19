@@ -49,24 +49,24 @@ Work progresses through three sequential phases. The current phase is recorded i
 ---
 
 **Phase 1 — Ideation and Refinement**  
-*Fed by:* `.waypoint/conops.md`  
-*Outputs to:* `.waypoint/design/*`
+_Fed by:_ `.waypoint/conops.md`  
+_Outputs to:_ `.waypoint/design/*`
 
 The design phase. Ideas are raised, debated, and accepted or discarded. Focus is on requirements, possibilities, and risks. The phase concludes when requirements are settled, approaches are chosen, and designs are finalized. Nothing is built here.
 
 ---
 
 **Phase 2 — Planning**  
-*Fed by:* `.waypoint/design/*`  
-*Outputs to:* `.waypoint/plan/*`
+_Fed by:_ `.waypoint/design/*`  
+_Outputs to:_ `.waypoint/plan/*`
 
 Define the work: what needs to be done, in what order, and by what roles. The phase concludes when the plan is complete enough to begin execution.
 
 ---
 
 **Phase 3 — Execution**  
-*Fed by:* `.waypoint/plan/*`  
-*Outputs to:* `.` (repository root)
+_Fed by:_ `.waypoint/plan/*`  
+_Outputs to:_ `.` (repository root)
 
 Build, test, and document according to the plan. All code, configuration, and documentation is produced here.
 
@@ -77,6 +77,7 @@ Build, test, and document according to the plan. All code, configuration, and do
 **Defer to the host tool's permission model.** Your runtime (Claude Code, Cursor, etc.) governs which actions require the operator's approval. When the operator has granted a permission — for a command, an edit, a tool, or a whole session — that grant is authoritative; act on it. Do not layer a second, in-conversation approval on top of actions the host has already cleared. Re-asking for what the operator already permitted wastes their attention and is the wrong kind of caution.
 
 **Reserve confirmation for the genuinely consequential.** Independent of routine permissions, pause and confirm before actions that are hard to reverse or reach beyond this repository — unless you are already authorized to proceed:
+
 - Deleting or overwriting data you did not create
 - Operating outside this repository
 - Publishing or sending anything to an external service
@@ -93,22 +94,22 @@ Build, test, and document according to the plan. All code, configuration, and do
 - **Changelog** — For moderate to large changes, add a brief human-readable entry to `CHANGELOG.md`.
 - **README** — Update `README.md` when changes affect how someone would understand or use the project.
 - **Documents** — All prose and text documents are written in Markdown.
-- **Tone** — Prefer brevity and precision. Keep terminology simple and clear. Avoid long-winded prose.
+- **Tone** — Write like a colleague who's deep in the same problem as you — direct, plain, a little tired, focused on getting the thing right rather than sounding impressive. Human, not clipped or robotic: full sentences, natural phrasing, say things the way you'd actually say them to someone sitting next to you. But no throat-clearing, no restating the request before answering, no flourish for its own sake. Skip inflated language (_robust, seamless, elevate, unlock, delve, empower, journey, game-changing_) and rhetorical framing ("What's really happening here is…"). No preamble before tool calls, no recap after — just the result, said plainly. Cut manufactured contrast — tacked-on phrases like "not just clean sailing," "no small feat," "not without its challenges," "and that's the real win here" that invent drama around routine work nobody was worried about. If a sentence reads the same or better with the contrastive tail removed, remove it: "Two real bugs caught along the way, not just clean sailing" should just be "Two real bugs caught along the way." This drifts back toward polished, promotional phrasing over long sessions; treat that as an error to correct, not a stylistic choice.
 
 ### 3e. Code Standards
 
 **Guiding principle:** optimize for readability and ease of maintenance above all else.
 
-| Concern | Standard |
-|---|---|
-| Style | Follow the proforma idioms of the language — no invented conventions |
-| Explicitness | Prefer explicit over implicit; avoid code golf |
-| Expressions | Do not nest — avoid `foo(bar(baz()))` |
-| Identifiers | Short, plain, single words where logical |
-| Doc strings | Required on exported or public symbols; keep them short and clear |
-| Error handling | Never silently discard errors; every error must be handled or explicitly propagated |
-| Dependencies | Prefer the standard library; reach for external packages only when the stdlib is insufficient |
-| Comments | Explain intent and tradeoffs, not mechanics; do not narrate what the code already says |
+| Concern        | Standard                                                                                      |
+| -------------- | --------------------------------------------------------------------------------------------- |
+| Style          | Follow the proforma idioms of the language — no invented conventions                          |
+| Explicitness   | Prefer explicit over implicit; avoid code golf                                                |
+| Expressions    | Do not nest — avoid `foo(bar(baz()))`                                                         |
+| Identifiers    | Short, plain, single words where logical                                                      |
+| Doc strings    | Required on exported or public symbols; keep them short and clear                             |
+| Error handling | Never silently discard errors; every error must be handled or explicitly propagated           |
+| Dependencies   | Prefer the standard library; reach for external packages only when the stdlib is insufficient |
+| Comments       | Explain intent and tradeoffs, not mechanics; do not narrate what the code already says        |
 
 > **Project extension point.** Add language-specific or project-specific standards below this line.
 > Examples: logging library and format conventions, test framework expectations, naming patterns, linting rules.
