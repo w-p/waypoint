@@ -12,12 +12,16 @@
 #   install-core     Templates and skills only (no editor adapter)
 #   install-claude   install-core + Claude Code adapter (.claude/rules/waypoint.md)
 #   install-cursor   install-core + Cursor adapter (.cursor/rules/session-briefing.mdc)
-#   update           Migrate layout, refresh skills + adapter, report OPORD drift
+#   update           Pull, migrate layout, refresh skills + adapter, report changes
 #   update-skills    Refresh core skills only
 #   migrate          Bring an older install up to the current on-disk layout
 #   help             Show this message
 #
 # dest is the project root to install/update. Defaults to the current directory.
+#
+# install and update pull this checkout first, so you install what is actually
+# current rather than whatever you last happened to fetch. WAYPOINT_NO_PULL=1
+# disables that for offline use.
 
 set -euo pipefail
 
@@ -35,6 +39,8 @@ CORE_SKILLS="new-project.md new-feature.md new-skill.md onboarding.md resume.md 
 
 install_core() {
 	local dest="$1" wp="$1/.waypoint"
+
+	pull_source
 
 	echo ""
 	echo "→ Creating .waypoint/ directory structure..."
@@ -57,9 +63,7 @@ install_core() {
 	cp "$TMPL_SRC/memory.md" "$wp/memory/README.md"
 	echo "  ✓ .waypoint/memory/README.md"
 
-	# The CONOPS template is a reference to author from; always keep it current.
-	cp "$TMPL_SRC/conops.md" "$wp/conops-template.md"
-	echo "  ✓ .waypoint/conops-template.md"
+	conops_template "$dest"
 
 	echo ""
 	echo "→ Installing skills..."
@@ -73,10 +77,33 @@ install_core() {
 		fi
 	done
 
+	write_revision "$dest"
+
 	echo ""
-	echo "  Next: produce your CONOPS. Tell your assistant:"
-	echo "    Read .waypoint/skills/new-project.md and follow it."
+	if [ -f "$wp/conops.md" ]; then
+		echo "  CONOPS already written — nothing further to author."
+	else
+		echo "  Next: produce your CONOPS. Tell your assistant:"
+		echo "    Read .waypoint/skills/new-project.md and follow it."
+	fi
 	echo ""
+}
+
+# The CONOPS template is scaffolding for writing conops.md, not a permanent
+# fixture. While there is no CONOPS we keep the scaffold current so you author
+# from the latest structure; once conops.md exists it has done its job and is
+# removed. A shipped template that changes later is never applied to a written
+# CONOPS — revising one is a deliberate act the developer has to approve.
+conops_template() {
+	local wp="$1/.waypoint"
+
+	if [ ! -f "$wp/conops.md" ]; then
+		cp "$TMPL_SRC/conops.md" "$wp/conops-template.md"
+		echo "  ✓ .waypoint/conops-template.md"
+	elif [ -f "$wp/conops-template.md" ]; then
+		rm "$wp/conops-template.md"
+		echo "  - .waypoint/conops-template.md  (scaffolding — conops.md is written)"
+	fi
 }
 
 # There is no reliable way to detect which editor you're using from a shell
@@ -169,6 +196,8 @@ migrate() {
 	fi
 	cp "$TMPL_SRC/memory.md" "$wp/memory/README.md"
 
+	conops_template "$dest"
+
 	# Claude adapter relocation: an older install embedded the briefing in a
 	# CLAUDE.md. Adopt the standalone rule file, then flag the old block.
 	if has_legacy_block "$dest" && [ ! -f "$dest/.claude/rules/waypoint.md" ]; then
@@ -176,6 +205,118 @@ migrate() {
 		echo "  ~ Claude adapter → .claude/rules/waypoint.md"
 	fi
 	report_legacy_block "$dest" || true
+}
+
+# ─── Source freshness and revision stamp ─────────────────────────────────────
+
+# Everything is copied out of this checkout, so a stale checkout quietly installs
+# stale content — `update` reports success and changes nothing. Pull first.
+#
+# Nothing here is fatal. A tarball download, no network, local edits, a detached
+# HEAD or a fork with no upstream are all legitimate states; we say what we found
+# and carry on with the files as they are. Set WAYPOINT_NO_PULL=1 to skip
+# entirely (offline use, and the test suite, which must not touch your checkout).
+pull_source() {
+	echo ""
+	echo "→ Checking the Waypoint checkout..."
+
+	if [ -n "${WAYPOINT_NO_PULL:-}" ]; then
+		echo "  ~ WAYPOINT_NO_PULL is set — using the checkout as-is."
+		return
+	fi
+	if ! git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+		echo "  ~ Not a git checkout — using the files as they are on disk."
+		return
+	fi
+	if [ -n "$(git -C "$ROOT" status --porcelain 2>/dev/null)" ]; then
+		echo "  ! The checkout has uncommitted changes — not pulling."
+		echo "    Installing from your working tree as-is."
+		return
+	fi
+	if ! git -C "$ROOT" symbolic-ref -q HEAD >/dev/null 2>&1; then
+		echo "  ! The checkout is on a detached HEAD — not pulling."
+		return
+	fi
+	if ! git -C "$ROOT" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
+		echo "  ~ No upstream branch is configured — nothing to pull."
+		return
+	fi
+
+	local before after
+	before="$(git -C "$ROOT" rev-parse --short HEAD)"
+	if ! git -C "$ROOT" pull --ff-only --quiet 2>/dev/null; then
+		echo "  ! Could not pull (offline, or the branch has diverged)."
+		echo "    Continuing with the checkout at $before."
+		return
+	fi
+	after="$(git -C "$ROOT" rev-parse --short HEAD)"
+
+	if [ "$before" = "$after" ]; then
+		echo "  ✓ Already current ($after)."
+	else
+		echo "  ✓ Pulled $before → $after."
+	fi
+}
+
+# The revision this checkout is at, or empty if it isn't a git checkout.
+source_revision() {
+	git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || true
+}
+
+# Record which revision a project was installed from. This is the whole of the
+# version story for now: the version *is* the source commit, so it cannot drift
+# from the content the way a hand-maintained version number would.
+write_revision() {
+	local wp="$1/.waypoint" rev
+	rev="$(source_revision)"
+	if [ -z "$rev" ]; then
+		return
+	fi
+	cat >"$wp/VERSION" <<-EOF
+		# Waypoint — the source revision this project was last installed from.
+		# Written by the installer; do not edit by hand.
+		revision: $rev
+		updated:  $(date +%Y-%m-%d)
+	EOF
+}
+
+# The revision previously stamped into the project, or empty if never stamped.
+installed_revision() {
+	local wp="$1/.waypoint"
+	if [ ! -f "$wp/VERSION" ]; then
+		return
+	fi
+	sed -n 's/^revision:[[:space:]]*//p' "$wp/VERSION"
+}
+
+# Show what actually moved between the project's stamped revision and this
+# checkout, limited to the directories whose contents get installed. The
+# changelog problem, answered with the git history already on disk.
+report_changes() {
+	local dest="$1" from="$2" log
+	if [ -z "$from" ]; then
+		return
+	fi
+	if ! git -C "$ROOT" cat-file -e "${from}^{commit}" 2>/dev/null; then
+		echo "  ~ Revision $from is not in this checkout — skipping the change list."
+		return
+	fi
+
+	log="$(git -C "$ROOT" log --oneline "$from..HEAD" -- skills templates adapters 2>/dev/null || true)"
+	if [ -z "$log" ]; then
+		echo "  ✓ No framework content changed since $from."
+		return
+	fi
+
+	echo "  Framework changes since $from:"
+	echo "$log" | sed 's/^/    /'
+
+	# The OPORD is the one file update refuses to touch, so a baseline change is
+	# work the user has to do by hand. Call it out rather than burying it.
+	if [ -n "$(git -C "$ROOT" log --oneline "$from..HEAD" -- templates/opord.md 2>/dev/null)" ]; then
+		echo ""
+		echo "  ! The OPORD baseline moved in that range — see the check below."
+	fi
 }
 
 # ─── Update ──────────────────────────────────────────────────────────────────
@@ -197,11 +338,17 @@ update_skills() {
 }
 
 update() {
-	local dest="$1" wp="$1/.waypoint"
+	local dest="$1" wp="$1/.waypoint" from
 	if [ ! -d "$wp" ]; then
 		echo "  Error: $wp does not exist. Run install first." >&2
 		exit 1
 	fi
+
+	# Read the stamp before pulling — it records where this project came from,
+	# which is what the change list is measured against.
+	from="$(installed_revision "$dest")"
+
+	pull_source
 
 	echo ""
 	echo "→ Migrating layout if needed..."
@@ -218,6 +365,12 @@ update() {
 		install_claude_rule "$dest"
 		echo "  ✓ .claude/rules/waypoint.md"
 	fi
+
+	write_revision "$dest"
+
+	echo ""
+	echo "→ What changed..."
+	report_changes "$dest" "$from"
 
 	echo ""
 	echo "→ Checking OPORD baseline..."
@@ -256,7 +409,7 @@ usage() {
     install-claude    Install with Claude Code adapter
     install-core      Install templates and skills only (no adapter)
 
-    update            Migrate layout, refresh skills + adapter, check OPORD drift
+    update            Pull, migrate layout, refresh skills + adapter, report changes
     update-skills     Refresh core skills only
     migrate           Bring an older install up to the current layout
 
@@ -266,6 +419,9 @@ usage() {
     dest is the project root to install/update. Defaults to the current
     directory — run from anywhere by cd'ing into your project first:
       cd your-project && $0 install-cursor
+
+  Environment:
+    WAYPOINT_NO_PULL=1   Don't pull this checkout before installing (offline use)
 
 EOF
 }

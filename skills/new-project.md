@@ -59,18 +59,19 @@ Before writing anything, list the questions that are not yet answered:
 
 When the conversation has converged — the problem is understood, an approach is agreed on, constraints are known, and open questions are identified — write the CONOPS.
 
-Use the template at `.waypoint/conops-template.md`. Fill in all eight sections. Do not skip or combine sections.
+Work from the scaffold at `.waypoint/conops-template.md` and write the finished document to `.waypoint/conops.md`. Fill in all eight sections. Do not skip or combine sections.
 
 Present the draft to the developer for review. Revise until approved.
 
 ### Phase 5 — Initialize the project
 
-After the CONOPS is approved:
+The installer has already placed `.waypoint/opord.md` and `.waypoint/project.md` — both are yours to fill in, not to create. After the CONOPS is approved:
 
-1. Copy `templates/opord.md` to `.waypoint/opord.md`. Extend the code standards section with any project-specific conventions discussed during the CONOPS conversation.
-2. Initialize `.waypoint/project.md` from `templates/project.md`. Set the phase to Ideation.
-3. Create the first session file in `.waypoint/memory/` (named `YYYY-MM-DD-<slug>.md`) with a dated entry summarizing the project briefing. See `.waypoint/memory/README.md` for the convention.
-4. Confirm with the developer that the project is ready to proceed.
+1. Extend `.waypoint/opord.md` below the project extension point in §3e with any project-specific conventions discussed during the CONOPS conversation. Leave the baseline rules above it intact.
+2. Fill in `.waypoint/project.md`: set the phase to Ideation, record the approach decisions reached during the conversation, and point the ground truth index at the CONOPS.
+3. Delete `.waypoint/conops-template.md`. It is scaffolding for writing the CONOPS and has no further use once `conops.md` exists.
+4. Create the first session file in `.waypoint/memory/` (named `YYYY-MM-DD-<slug>.md`) with a dated entry summarizing the project briefing. See `.waypoint/memory/README.md` for the convention.
+5. Confirm with the developer that the project is ready to proceed.
 
 ---
 

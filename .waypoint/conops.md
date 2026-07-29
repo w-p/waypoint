@@ -80,7 +80,7 @@ Waypoint lives in a `.waypoint/` directory at the root of the project repository
   skills/           Entry point guides and reusable domain procedures
 ```
 
-**Vendor adapters** are thin integration files that wire the framework's session-start briefing into a specific tool's native mechanism — Cursor rules, a `CLAUDE.md`, an `AGENTS.md`, and so on. Adapters live under `.waypoint/adapters/` and are the only vendor-specific artifacts. All other `.waypoint/` files are identical regardless of which tool is in use.
+**Vendor adapters** are thin integration files that wire the framework's session-start briefing into a specific tool's native mechanism — Cursor rules, Claude Code rules, an `AGENTS.md`, and so on. They ship in the Waypoint repository under `adapters/` and install into the host tool's own rules location: `.claude/rules/waypoint.md` for Claude Code, `.cursor/rules/session-briefing.mdc` for Cursor. Nothing vendor-specific is written inside `.waypoint/` — everything there is identical regardless of which tool is in use, and the adapter never edits a project's existing instruction files.
 
 **The framework ships** a set of templates and core skill documents that a developer copies into their project's `.waypoint/` when adopting Waypoint. Projects then customise the OPORD and CONOPS for their context; the templates themselves are not modified.
 

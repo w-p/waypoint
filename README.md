@@ -1,112 +1,128 @@
 # Waypoint
 
-Waypoint is a lightweight, vendor-agnostic framework for AI-assisted software development. It gives an AI coding assistant a persistent, structured home inside a project — so that institutional knowledge survives session boundaries, contributors can orient quickly, and development follows a consistent, phase-gated process.
+A `.waypoint/` directory of plain Markdown that gives your AI coding assistant persistent
+project knowledge and a phase-gated workflow. No runtime, no dependencies, no service.
+The assistant reads it at the start of every session, so you stop re-explaining your
+project.
 
-## What Waypoint is
+## Install
 
-Waypoint solves a knowledge and process problem: AI assistants are stateless by default. Every session starts without knowledge of the project's history, decisions, constraints, or current state. Waypoint addresses this by providing a canonical set of plain Markdown documents in a `.waypoint/` directory that the AI reads at the start of every session. These documents are version-controlled alongside the code and require no runtime or tooling to use.
-
-The framework also defines a three-phase development workflow — Ideation, Planning, Execution — that prevents premature implementation and preserves human approval authority at each phase transition. A library of skill documents provides entry points for common activities: starting a project, adding a feature, onboarding a new contributor, resuming after a gap.
-
-Waypoint is a knowledge management and process governance layer. It does not prescribe how tests are written, how commits are structured, how branches are managed, or how code is reviewed. Those concerns belong to the developer and to whatever tools they choose.
-
-## How Waypoint differs from execution frameworks like Superpowers
-
-[Superpowers](https://github.com/obra/superpowers) is a software development methodology that governs how an AI assistant develops software within a session — TDD enforcement, implementation planning, subagent orchestration, code review integration, and git workflows. Waypoint and Superpowers address different layers of the same problem and are designed to coexist.
-
-Waypoint governs **what the AI knows** — project intent, architecture decisions, current state, accumulated memory. Superpowers governs **how the AI builds** — test cycles, task execution, branch management. A project can use both simultaneously: Waypoint provides the project knowledge and process framework; Superpowers (or any equivalent tool) handles the execution mechanics. Neither knows about the other and neither depends on the other.
-
-## Directory structure
-
-```
-.waypoint/
-  opord.md          Standing orders for the AI assistant
-  conops.md         Project intent, scope, and constraints
-  project.md        Current phase, shipped/deferred inventory, ground truth index
-  memory/           Cross-session continuity log (one file per session)
-  design/           Finalized architecture decisions
-  plan/             Sequenced work plans
-  features/         As-built documentation per shipped feature
-  skills/           Entry point guides and domain-specific procedures
-```
-
-## Getting started
-
-### 1. Install Waypoint
-
-- Clone 
-- `cd` into your project
-- Run the installer from the waypoint directory
-
-The install target is `pwd` unless otherwise specified. It creates `.waypoint/` and wires up the appropriate adapter. Commit `.waypoint/` and the adapter files with your project.
+Clone Waypoint somewhere permanent — `update` runs from the checkout, so keep it around.
+Then run it against your project.
 
 ```bash
-git clone https://github.com/<org>/waypoint waypoint
+git clone https://github.com/w-p/waypoint ~/src/waypoint
+
 cd your-project
-./waypoint/waypoint install-cursor    # Cursor
-# or
-./waypoint/waypoint install-claude    # Claude Code
-# or
-./waypoint/waypoint install-core                     # Templates and skills only, no adapter
-# or
-./waypoint/waypoint install-cursor /path/to/project  # Install to another path
+~/src/waypoint/waypoint install-claude    # Claude Code
+~/src/waypoint/waypoint install-cursor    # Cursor
+~/src/waypoint/waypoint install-core      # Templates and skills only, no adapter
 ```
 
-Run `./waypoint/waypoint help` to see all available commands.
+Installs into the current directory unless you pass a path: `waypoint install-claude
+/path/to/project`. There is no bare `install` — the script can't tell which editor you
+use and won't guess.
 
-### 2. Produce your CONOPS
+You get `.waypoint/` plus one rule file for your editor (`.claude/rules/waypoint.md` or
+`.cursor/rules/session-briefing.mdc`). Nothing else is touched — your existing
+`CLAUDE.md` and rules are left alone. Commit all of it.
 
-Open a session with your AI assistant and say something like:
+## Then write your CONOPS
 
-> Let's set up this project. I want to build [brief description].
+```
+Read .waypoint/skills/new-project.md and follow it.
+```
 
-The agent, primed by the OPORD, will find and follow the `new-project` skill automatically. It will ask questions, explore the design space with you, and produce the `conops.md`. Do not write it yourself — the value is in the conversation that produces it.
+The assistant interviews you about what you're building and writes `.waypoint/conops.md`
+from that conversation. Don't write it yourself — the value is in the questions it asks.
+Expect 15–45 minutes.
 
-### 3. Verify
+To check the wiring took: open a fresh session and say nothing but hello. You should get
+`Ready.` and nothing else. Open with a real question instead and it briefly notes it's
+coming up to speed, then answers.
 
-Open a new session with no request — just a greeting. The AI should respond with **"Ready."** and nothing else. If instead you open with a question, it briefly notes it's coming up to speed and then answers directly. Either way, Waypoint is working.
+## What's in `.waypoint/`
 
-### Keeping up to date
+```
+opord.md      Standing orders — what the assistant reads, how it behaves, code standards
+conops.md     What the project is, who uses it, what's in and out of scope
+project.md    Current phase, what shipped, what's deferred, where the docs are
+memory/       One file per session; how context survives compaction and gaps
+design/       Architecture decisions, written before anything is built
+plan/         Sequenced work, written before anything is built
+features/     As-built docs, written after something ships
+skills/       Procedures the assistant follows for recurring activities
+```
 
-When the framework ships new versions:
+`opord.md` is yours once installed — extend it at the marked extension point in §3e with
+your language conventions, test expectations, linting rules. `update` never overwrites it.
+
+## Workflow
+
+```
+Ideation              →   Planning              →   Execution
+Explore approaches        Break into tasks          Build from the plan
+Debate tradeoffs          Set acceptance criteria   Document what shipped
+Write design/*            Write plan/*              Update project.md + memory/
+  ↓ you approve             ↓ you approve             ↓ feature complete
+```
+
+The point is that no code gets written before you've approved a design and a plan. The
+current phase lives in `project.md`.
+
+## Skills
+
+| Skill | Use it when |
+|---|---|
+| `new-project` | Starting a Waypoint project; produces the CONOPS |
+| `new-feature` | Adding a real capability, through all three phases |
+| `new-skill` | You've explained the same procedure twice |
+| `onboarding` | Briefing a contributor with no context |
+| `resume` | Picking up after a gap or a compaction |
+| `debug` | Something's broken; no phase gates |
+
+Point the assistant at one by name: `Read .waypoint/skills/debug.md and follow it.`
+
+## Staying current
 
 ```bash
-./waypoint/waypoint update          # Migrate layout, refresh skills + adapter, check OPORD drift
-./waypoint/waypoint update-skills   # Core skills only
-./waypoint/waypoint migrate         # Bring an older install up to the current layout only
+~/src/waypoint/waypoint update          # Everything below
+~/src/waypoint/waypoint update-skills   # Core skills only
+~/src/waypoint/waypoint migrate         # Layout only
 ```
 
-`update` is safe to run repeatedly. It:
+`update` is safe to run repeatedly:
 
-- **Migrates layout** — an old single `.waypoint/memory.md` is moved into `.waypoint/memory/` (as a dated `-legacy.md` file); the folder convention is installed. An older adapter that embedded the briefing in `CLAUDE.md` is relocated to `.claude/rules/waypoint.md`, and the stale block is reported for you to remove.
-- **Refreshes core skills** — user-created skills in `.waypoint/skills/` are never touched.
-- **Refreshes the adapter** — both adapters are standalone rule files (`.claude/rules/waypoint.md` and `.cursor/rules/session-briefing.mdc`), replaced wholesale.
-- **Checks the OPORD** — your `.waypoint/opord.md` is yours to extend, so `update` never rewrites it. If the shipped baseline has moved, it prints a `diff` command so you can merge framework changes by hand.
+- **The checkout is pulled first**, so you get what's actually current rather than
+  whatever you last happened to fetch. If it has local edits, is on a detached HEAD, has
+  no upstream, or you're offline, it says so and carries on with the files on disk.
+  `WAYPOINT_NO_PULL=1` skips the pull.
+- **What changed is reported.** `.waypoint/VERSION` records the source commit you
+  installed from, so `update` can list the framework changes you're crossing — and flag
+  when the OPORD baseline is among them, since that one you merge by hand.
+- **Core skills** and **your editor's adapter** are replaced wholesale. Skills you wrote
+  yourself are never touched.
+- **Layout** is migrated forward. An old single `memory.md` becomes a dated file inside
+  `memory/`. A briefing that an old version embedded in your `CLAUDE.md` moves to
+  `.claude/rules/waypoint.md`, and the stale block is reported for you to delete.
+- **`opord.md` is left alone**, because you've extended it. If the shipped baseline moved,
+  `update` prints a `diff` command and you merge by hand.
+- **`conops-template.md`** is scaffolding. It's kept current while you have no CONOPS and
+  removed once `conops.md` exists. A CONOPS you've written is never rewritten.
 
-Installing into a project that already has instructions is safe: each adapter is its own file under `.claude/rules/` or `.cursor/rules/`, so Waypoint never edits your `CLAUDE.md` or other rules.
+What changed between updates is in [CHANGELOG.md](CHANGELOG.md), including anything you
+need to merge by hand.
 
-## Skills reference
+Changing the installer? `./test.sh` covers what `update` promises not to touch.
 
-| Skill | Purpose |
-|---|---|
-| `new-project` | Initialize a Waypoint-tracked project; produce CONOPS collaboratively |
-| `new-feature` | Develop a new feature through the three-phase workflow |
-| `new-skill` | Identify and encode a reusable domain procedure |
-| `onboarding` | Brief a new contributor on an existing project |
-| `resume` | Re-brief after a session gap or context compaction |
-| `debug` | Unstructured investigation; no phase gates |
+## What Waypoint doesn't do
 
-## The development workflow
+It doesn't touch execution mechanics — no TDD enforcement, no git or branching strategy,
+no commit conventions, no CI, no subagent orchestration. It governs what the assistant
+*knows*; tools like [Superpowers](https://github.com/obra/superpowers) govern how it
+*builds*. Run both if you want. Neither knows the other exists.
 
-```
-Ideation                Planning               Execution
-─────────────────────── ──────────────────── ──────────────────────
-Describe the intent     Break work into       Build from the plan
-Explore approaches      tasks with clear      Document what shipped
-Debate tradeoffs        acceptance criteria   Update memory and
-Write design doc        Write plan doc        project state
-  ↓ human approves        ↓ human approves      ↓ feature complete
-```
+It also assumes a frontier model. Behavior on weaker models is untested.
 
 ## License
 
