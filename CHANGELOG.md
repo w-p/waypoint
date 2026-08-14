@@ -30,8 +30,14 @@ affects those, merging is manual.
 - **Feature docs are as-built records.** The §3d duty now says a feature doc describes the
   capability as it exists today and stays current; the design that produced it stays frozen as
   the decision record. Also new in the tone duty: use em dashes sparingly. *Manual merge — §3d.*
-- **`update-skills` now pulls the checkout first**, like `install` and `update`, so a stale
-  checkout can't quietly install stale skills.
+- **Updating is now a skill.** `waypoint update` and `update-skills` are stubs pointing at
+  the new `update-waypoint` core skill, and `migrate` is folded into install. The skill
+  finds your Waypoint source (`.waypoint/VERSION` now records the `origin:` repo alongside
+  the commit), reinstalls the framework files, summarizes what changed, and merges OPORD
+  baseline changes with you reviewing the diff. Reinstalling refreshes core skills
+  wholesale and heals legacy layouts directly, and an OPORD you never extended is
+  fast-forwarded to the new baseline automatically, so the manual merges flagged above
+  apply only if you extended yours.
 - Added a test asserting the dogfooded `.waypoint/` stays byte-identical to the shipped
   templates, so editing one copy can't silently drift from the other.
 

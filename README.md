@@ -7,8 +7,9 @@ project.
 
 ## Install
 
-Clone Waypoint somewhere permanent — `update` runs from the checkout, so keep it around.
-Then run it against your project.
+Clone Waypoint and run it against your project. The clone doesn't need to be permanent:
+`.waypoint/VERSION` records where it came from, and updates can fetch the source
+themselves (see [Staying current](#staying-current)).
 
 ```bash
 git clone https://github.com/w-p/waypoint ~/src/waypoint
@@ -80,40 +81,44 @@ current phase lives in `project.md`.
 | `onboarding` | Briefing a contributor with no context |
 | `resume` | Picking up after a gap or a compaction |
 | `debug` | Something's broken; no phase gates |
+| `update-waypoint` | Updating the installed framework from its source repo |
 
 Point the assistant at one by name: `Read .waypoint/skills/debug.md and follow it.`
 
 ## Staying current
 
-```bash
-~/src/waypoint/waypoint update          # Everything below
-~/src/waypoint/waypoint update-skills   # Core skills only
-~/src/waypoint/waypoint migrate         # Layout only
+Updating is a skill, not a command. Tell your assistant:
+
+```
+Read .waypoint/skills/update-waypoint.md and follow it.
 ```
 
-`update` is safe to run repeatedly:
+It finds your Waypoint source (`.waypoint/VERSION` records the repo and commit you
+installed from), reinstalls the framework files, summarizes the changes you're crossing,
+and merges OPORD baseline changes into your extended copy with you reviewing the diff.
+That last part is the reason it's a skill: merging prose takes judgment a script doesn't
+have.
+
+The mechanical half is plain reinstalling, safe to run directly any time:
 
 - **The checkout is pulled first**, so you get what's actually current rather than
   whatever you last happened to fetch. If it has local edits, is on a detached HEAD, has
   no upstream, or you're offline, it says so and carries on with the files on disk.
   `WAYPOINT_NO_PULL=1` skips the pull.
-- **What changed is reported.** `.waypoint/VERSION` records the source commit you
-  installed from, so `update` can list the framework changes you're crossing — and flag
-  when the OPORD baseline is among them, since that one you merge by hand.
-- **Core skills** and **your editor's adapter** are replaced wholesale. Skills you wrote
-  yourself are never touched.
-- **Layout** is migrated forward. An old single `memory.md` becomes a dated file inside
+- **Framework-owned files are replaced wholesale**: core skills, your editor's adapter,
+  the memory README. Skills you wrote yourself are never touched.
+- **Project-owned files are never rewritten**: `project.md`, a written `conops.md`, and
+  an OPORD you've extended. An OPORD you *haven't* extended is fast-forwarded to the new
+  baseline automatically; the installer can prove nothing was lost.
+- **Old layouts are healed.** A legacy single `memory.md` becomes a dated file inside
   `memory/`. A briefing that an old version embedded in your `CLAUDE.md` moves to
   `.claude/rules/waypoint.md`, and the stale block is reported for you to delete.
-- **`opord.md` is left alone**, because you've extended it. If the shipped baseline moved,
-  `update` prints a `diff` command and you merge by hand.
 - **`conops-template.md`** is scaffolding. It's kept current while you have no CONOPS and
-  removed once `conops.md` exists. A CONOPS you've written is never rewritten.
+  removed once `conops.md` exists.
 
-What changed between updates is in [CHANGELOG.md](CHANGELOG.md), including anything you
-need to merge by hand.
+What changed between updates is in [CHANGELOG.md](CHANGELOG.md).
 
-Changing the installer? `./test.sh` covers what `update` promises not to touch.
+Changing the installer? `./test.sh` covers what reinstalling promises not to touch.
 
 ## Using Waypoint well
 

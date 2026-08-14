@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# waypoint — install, update, and migrate the Waypoint framework inside a project.
+# waypoint — install the Waypoint framework inside a project.
 #
 # Run from anywhere by whatever path reaches this script; it operates on your
 # current directory by default, so the common case is:
@@ -12,16 +12,19 @@
 #   install-core     Templates and skills only (no editor adapter)
 #   install-claude   install-core + Claude Code adapter (.claude/rules/waypoint.md)
 #   install-cursor   install-core + Cursor adapter (.cursor/rules/session-briefing.mdc)
-#   update           Pull, migrate layout, refresh skills + adapter, report changes
-#   update-skills    Refresh core skills only
-#   migrate          Bring an older install up to the current on-disk layout
 #   help             Show this message
 #
-# dest is the project root to install/update. Defaults to the current directory.
+# Reinstalling is also how framework files are refreshed: it updates everything
+# framework-owned (core skills, adapter, memory README), heals legacy layouts,
+# and never touches project-owned files. Updating a project end to end is the
+# update-waypoint skill's job; the old update/update-skills/migrate commands
+# are stubs that say so.
 #
-# install, update, and update-skills pull this checkout first, so you install
-# what is actually current rather than whatever you last happened to fetch.
-# WAYPOINT_NO_PULL=1 disables that for offline use.
+# dest is the project root to install into. Defaults to the current directory.
+#
+# install pulls this checkout first, so you install what is actually current
+# rather than whatever you last happened to fetch. WAYPOINT_NO_PULL=1 disables
+# that for offline use.
 
 set -euo pipefail
 
@@ -31,9 +34,9 @@ SKILLS_SRC="$ROOT/skills"
 TMPL_SRC="$ROOT/templates"
 ADAPTERS="$ROOT/adapters"
 
-# Core skills shipped by the framework. update/update-skills refresh exactly these;
+# Core skills shipped by the framework. Install refreshes exactly these;
 # user-authored skills in .waypoint/skills/ are never touched.
-CORE_SKILLS="new-project.md new-feature.md new-skill.md onboarding.md resume.md debug.md"
+CORE_SKILLS="new-project.md new-feature.md new-skill.md onboarding.md resume.md debug.md update-waypoint.md"
 
 # ─── Core ────────────────────────────────────────────────────────────────────
 
@@ -46,18 +49,17 @@ install_core() {
 	echo "→ Creating .waypoint/ directory structure..."
 	mkdir -p "$wp"/design "$wp"/plan "$wp"/features "$wp"/skills "$wp"/memory
 
+	migrate_legacy "$dest"
+
 	echo ""
 	echo "→ Installing templates..."
-	local f dst
-	for f in opord project; do
-		dst="$wp/$f.md"
-		if [ ! -f "$dst" ]; then
-			cp "$TMPL_SRC/$f.md" "$dst"
-			echo "  + .waypoint/$f.md"
-		else
-			echo "  ~ .waypoint/$f.md  (exists, skipped)"
-		fi
-	done
+	install_opord "$dest"
+	if [ ! -f "$wp/project.md" ]; then
+		cp "$TMPL_SRC/project.md" "$wp/project.md"
+		echo "  + .waypoint/project.md"
+	else
+		echo "  ~ .waypoint/project.md  (exists, skipped)"
+	fi
 
 	# The memory README documents the folder convention; refresh it in place.
 	cp "$TMPL_SRC/memory.md" "$wp/memory/README.md"
@@ -67,14 +69,10 @@ install_core() {
 
 	echo ""
 	echo "→ Installing skills..."
+	local f
 	for f in $CORE_SKILLS; do
-		dst="$wp/skills/$f"
-		if [ ! -f "$dst" ]; then
-			cp "$SKILLS_SRC/$f" "$dst"
-			echo "  + .waypoint/skills/$f"
-		else
-			echo "  ~ .waypoint/skills/$f  (exists, skipped)"
-		fi
+		cp "$SKILLS_SRC/$f" "$wp/skills/$f"
+		echo "  ✓ .waypoint/skills/$f"
 	done
 
 	write_revision "$dest"
@@ -87,6 +85,37 @@ install_core() {
 		echo "    Read .waypoint/skills/new-project.md and follow it."
 	fi
 	echo ""
+}
+
+# The OPORD is project-owned once installed: the developer extends it, so a
+# blind overwrite could destroy their rules. But never touching it left
+# unextended copies stale forever. The middle path: when the project's copy is
+# byte-identical to the baseline it was installed from (per the VERSION stamp),
+# nothing was extended and the new baseline applies safely. Anything else is
+# left alone; the update-waypoint skill owns the merge.
+install_opord() {
+	local dest="$1" dst="$1/.waypoint/opord.md" from old
+	if [ ! -f "$dst" ]; then
+		cp "$TMPL_SRC/opord.md" "$dst"
+		echo "  + .waypoint/opord.md"
+		return
+	fi
+	if diff -q "$dst" "$TMPL_SRC/opord.md" >/dev/null 2>&1; then
+		echo "  ✓ .waypoint/opord.md  (matches the shipped baseline)"
+		return
+	fi
+	from="$(installed_revision "$dest")"
+	if [ -n "$from" ] && git -C "$ROOT" cat-file -e "${from}^{commit}" 2>/dev/null; then
+		old="$(git -C "$ROOT" show "${from}:templates/opord.md" 2>/dev/null || true)"
+		if [ -n "$old" ] && [ "$old" = "$(cat "$dst")" ]; then
+			cp "$TMPL_SRC/opord.md" "$dst"
+			echo "  ✓ .waypoint/opord.md  (unextended — fast-forwarded to the new baseline)"
+			return
+		fi
+	fi
+	echo "  ! .waypoint/opord.md differs from the shipped baseline — left alone."
+	echo "    To merge the new baseline, use the update-waypoint skill:"
+	echo "      Read .waypoint/skills/update-waypoint.md and follow it."
 }
 
 # The CONOPS template is scaffolding for writing conops.md, not a permanent
@@ -127,7 +156,6 @@ install_claude() {
 	echo "→ Installing Claude Code adapter..."
 	install_claude_rule "$dest"
 	echo "  + .claude/rules/waypoint.md"
-	report_legacy_block "$dest" || true
 	echo ""
 	echo "✓ Done. In a new Claude Code session: no request → 'Ready.';"
 	echo "  a question → it comes up to speed and answers it."
@@ -149,8 +177,8 @@ install_cursor() {
 
 # ─── Claude adapter (standalone rule file, like the Cursor adapter) ──────────
 
-# The Claude briefing is a plain rule file that loads every session. Install and
-# update are a wholesale copy — it never touches the project's own CLAUDE.md.
+# The Claude briefing is a plain rule file that loads every session. Install is
+# a wholesale copy — it never touches the project's own CLAUDE.md.
 install_claude_rule() {
 	local dest="$1"
 	mkdir -p "$dest/.claude/rules"
@@ -180,13 +208,11 @@ report_legacy_block() {
 	return $rc
 }
 
-# ─── Migration ───────────────────────────────────────────────────────────────
+# ─── Legacy layouts ──────────────────────────────────────────────────────────
 
-# Bring an existing install up to the current layout. Idempotent.
-migrate() {
+# Healed on every install; both cases are no-ops on a current project.
+migrate_legacy() {
 	local dest="$1" wp="$1/.waypoint"
-
-	mkdir -p "$wp"/design "$wp"/plan "$wp"/features "$wp"/skills "$wp"/memory
 
 	# memory.md (single append-file) → memory/ (one file per session).
 	if [ -f "$wp/memory.md" ]; then
@@ -194,12 +220,9 @@ migrate() {
 		mv "$wp/memory.md" "$legacy"
 		echo "  ~ memory.md → memory/$(basename "$legacy")"
 	fi
-	cp "$TMPL_SRC/memory.md" "$wp/memory/README.md"
 
-	conops_template "$dest"
-
-	# Claude adapter relocation: an older install embedded the briefing in a
-	# CLAUDE.md. Adopt the standalone rule file, then flag the old block.
+	# A pre-rules install embedded the briefing in a CLAUDE.md. Adopt the
+	# standalone rule file, then flag the old block for manual removal.
 	if has_legacy_block "$dest" && [ ! -f "$dest/.claude/rules/waypoint.md" ]; then
 		install_claude_rule "$dest"
 		echo "  ~ Claude adapter → .claude/rules/waypoint.md"
@@ -209,21 +232,14 @@ migrate() {
 
 # ─── Source freshness and revision stamp ─────────────────────────────────────
 
-# Everything is copied out of this checkout, so a stale checkout quietly installs
-# stale content — `update` reports success and changes nothing. Pull first.
+# Everything is copied out of this checkout, so a stale checkout quietly
+# installs stale content while reporting success. Pull first.
 #
 # Nothing here is fatal. A tarball download, no network, local edits, a detached
 # HEAD or a fork with no upstream are all legitimate states; we say what we found
 # and carry on with the files as they are. Set WAYPOINT_NO_PULL=1 to skip
 # entirely (offline use, and the test suite, which must not touch your checkout).
 pull_source() {
-	# At most once per invocation — update pulls before refreshing skills, and
-	# update_skills pulls when run standalone; the second call must not repeat it.
-	if [ -n "${PULLED:-}" ]; then
-		return
-	fi
-	PULLED=1
-
 	echo ""
 	echo "→ Checking the Waypoint checkout..."
 
@@ -270,21 +286,26 @@ source_revision() {
 	git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || true
 }
 
-# Record which revision a project was installed from. This is the whole of the
-# version story for now: the version *is* the source commit, so it cannot drift
-# from the content the way a hand-maintained version number would.
+# Record which revision and repository a project was installed from. The
+# version *is* the source commit, so it cannot drift from the content the way
+# a hand-maintained number would. origin is where newer content lives — it is
+# how the update-waypoint skill finds the source without a standing checkout.
 write_revision() {
-	local wp="$1/.waypoint" rev
+	local wp="$1/.waypoint" rev origin
 	rev="$(source_revision)"
 	if [ -z "$rev" ]; then
 		return
 	fi
-	cat >"$wp/VERSION" <<-EOF
-		# Waypoint — the source revision this project was last installed from.
-		# Written by the installer; do not edit by hand.
-		revision: $rev
-		updated:  $(date +%Y-%m-%d)
-	EOF
+	origin="$(git -C "$ROOT" remote get-url origin 2>/dev/null || true)"
+	{
+		echo "# Waypoint — the source this project was last installed from."
+		echo "# Written by the installer; do not edit by hand."
+		echo "revision: $rev"
+		if [ -n "$origin" ]; then
+			echo "origin:   $origin"
+		fi
+		echo "updated:  $(date +%Y-%m-%d)"
+	} >"$wp/VERSION"
 }
 
 # The revision previously stamped into the project, or empty if never stamped.
@@ -294,117 +315,6 @@ installed_revision() {
 		return
 	fi
 	sed -n 's/^revision:[[:space:]]*//p' "$wp/VERSION"
-}
-
-# Show what actually moved between the project's stamped revision and this
-# checkout, limited to the directories whose contents get installed. The
-# changelog problem, answered with the git history already on disk.
-report_changes() {
-	local dest="$1" from="$2" log
-	if [ -z "$from" ]; then
-		return
-	fi
-	if ! git -C "$ROOT" cat-file -e "${from}^{commit}" 2>/dev/null; then
-		echo "  ~ Revision $from is not in this checkout — skipping the change list."
-		return
-	fi
-
-	log="$(git -C "$ROOT" log --oneline "$from..HEAD" -- skills templates adapters 2>/dev/null || true)"
-	if [ -z "$log" ]; then
-		echo "  ✓ No framework content changed since $from."
-		return
-	fi
-
-	echo "  Framework changes since $from:"
-	echo "$log" | sed 's/^/    /'
-
-	# The OPORD is the one file update refuses to touch, so a baseline change is
-	# work the user has to do by hand. Call it out rather than burying it.
-	if [ -n "$(git -C "$ROOT" log --oneline "$from..HEAD" -- templates/opord.md 2>/dev/null)" ]; then
-		echo ""
-		echo "  ! The OPORD baseline moved in that range — see the check below."
-	fi
-}
-
-# ─── Update ──────────────────────────────────────────────────────────────────
-
-update_skills() {
-	local dest="$1" wp="$1/.waypoint"
-	if [ ! -d "$wp/skills" ]; then
-		echo "  Error: $wp/skills does not exist. Run install first." >&2
-		exit 1
-	fi
-
-	pull_source
-
-	echo ""
-	echo "→ Updating core skills..."
-	local f
-	for f in $CORE_SKILLS; do
-		cp "$SKILLS_SRC/$f" "$wp/skills/$f"
-		echo "  ✓ .waypoint/skills/$f"
-	done
-	echo ""
-}
-
-update() {
-	local dest="$1" wp="$1/.waypoint" from
-	if [ ! -d "$wp" ]; then
-		echo "  Error: $wp does not exist. Run install first." >&2
-		exit 1
-	fi
-
-	# Read the stamp before pulling — it records where this project came from,
-	# which is what the change list is measured against.
-	from="$(installed_revision "$dest")"
-
-	pull_source
-
-	echo ""
-	echo "→ Migrating layout if needed..."
-	migrate "$dest"
-
-	update_skills "$dest"
-
-	echo "→ Updating adapter..."
-	if [ -f "$dest/.cursor/rules/session-briefing.mdc" ]; then
-		cp "$ADAPTERS/cursor/rules/session-briefing.mdc" "$dest/.cursor/rules/session-briefing.mdc"
-		echo "  ✓ .cursor/rules/session-briefing.mdc"
-	fi
-	if [ -f "$dest/.claude/rules/waypoint.md" ]; then
-		install_claude_rule "$dest"
-		echo "  ✓ .claude/rules/waypoint.md"
-	fi
-
-	write_revision "$dest"
-
-	echo ""
-	echo "→ What changed..."
-	report_changes "$dest" "$from"
-
-	echo ""
-	echo "→ Checking OPORD baseline..."
-	opord_notice "$dest"
-
-	echo ""
-	echo "✓ Update complete."
-	echo ""
-}
-
-# The OPORD is project-owned once installed (you extend it). We never rewrite it;
-# we only report whether the shipped baseline has moved, and how to compare.
-opord_notice() {
-	local dest="$1" wp="$1/.waypoint"
-	if [ ! -f "$wp/opord.md" ]; then
-		return
-	fi
-	if diff -q "$wp/opord.md" "$TMPL_SRC/opord.md" >/dev/null 2>&1; then
-		echo "  ✓ OPORD matches the shipped baseline — nothing to merge."
-	else
-		echo "  ! OPORD differs from the shipped baseline (expected if you extended it)."
-		echo "    Review framework changes and merge by hand:"
-		echo "      diff \"$wp/opord.md\" \"$TMPL_SRC/opord.md\""
-	fi
 }
 
 # ─── Usage ───────────────────────────────────────────────────────────────────
@@ -419,16 +329,18 @@ usage() {
     install-claude    Install with Claude Code adapter
     install-core      Install templates and skills only (no adapter)
 
-    update            Pull, migrate layout, refresh skills + adapter, report changes
-    update-skills     Refresh core skills only
-    migrate           Bring an older install up to the current layout
-
   Usage:
     $0 <command> [dest]
 
-    dest is the project root to install/update. Defaults to the current
+    dest is the project root to install into. Defaults to the current
     directory — run from anywhere by cd'ing into your project first:
       cd your-project && $0 install-cursor
+
+    Reinstalling refreshes the framework-owned files (core skills, adapter,
+    memory README) and never touches your OPORD extensions, project.md, or a
+    written CONOPS. To update a project end to end, use the skill — tell
+    your assistant:
+      Read .waypoint/skills/update-waypoint.md and follow it.
 
   Environment:
     WAYPOINT_NO_PULL=1   Don't pull this checkout before installing (offline use)
@@ -444,6 +356,22 @@ case "$cmd" in
 	""|help|-h|--help)
 		usage
 		exit 0
+		;;
+	update|update-skills)
+		echo "Error: '$cmd' is no longer a script command — updating is a skill." >&2
+		echo "" >&2
+		echo "Tell your assistant:" >&2
+		echo "  Read .waypoint/skills/update-waypoint.md and follow it." >&2
+		echo "" >&2
+		echo "It finds your Waypoint source, reinstalls the framework files, reports" >&2
+		echo "what changed, and merges OPORD baseline changes with your review." >&2
+		exit 1
+		;;
+	migrate)
+		echo "Error: 'migrate' is folded into install — reinstalling migrates the layout:" >&2
+		echo "" >&2
+		echo "  $0 install-claude|install-cursor|install-core [dest]" >&2
+		exit 1
 		;;
 esac
 
@@ -474,16 +402,6 @@ case "$cmd" in
 	install-core)   install_core "$dest" ;;
 	install-claude) install_claude "$dest" ;;
 	install-cursor) install_cursor "$dest" ;;
-	update)         update "$dest" ;;
-	update-skills)  update_skills "$dest" ;;
-	migrate)
-		echo ""
-		echo "→ Migrating to the current layout..."
-		migrate "$dest"
-		echo ""
-		echo "✓ Migration complete."
-		echo ""
-		;;
 	*)
 		echo "Unknown command: $cmd" >&2
 		usage >&2

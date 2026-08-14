@@ -3,11 +3,12 @@
 # test.sh — regression tests for the waypoint installer.
 #
 # The installer copies, moves, and deletes files inside other people's projects,
-# and `update` makes promises about what it will not touch: your OPORD, your own
-# skills, a CONOPS you have written. These tests pin those promises down.
+# and reinstalling makes promises about what it will not touch: an OPORD you
+# extended, your own skills, a CONOPS you have written. These tests pin those
+# promises down.
 #
 # Everything runs against throwaway directories under a temp root. Nothing here
-# touches your checkout — WAYPOINT_NO_PULL keeps `update` from pulling it.
+# touches your checkout — WAYPOINT_NO_PULL keeps install from pulling it.
 #
 #   ./test.sh          run everything
 #   ./test.sh -v       also echo installer output for failing cases
@@ -87,6 +88,13 @@ project() {
 	echo "$d"
 }
 
+# An older commit of templates/opord.md from this repo's real history, for the
+# fast-forward tests. Empty when the checkout has no history to offer.
+old_baseline_rev() {
+	git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1 || return 0
+	git -C "$ROOT" log --format=%h --skip=1 -1 -- templates/opord.md 2>/dev/null
+}
+
 # ─── Install ─────────────────────────────────────────────────────────────────
 
 start "fresh install lays down the full structure"
@@ -97,6 +105,7 @@ exists "$p/.waypoint/project.md" "project.md installed"
 exists "$p/.waypoint/memory/README.md" "memory convention installed"
 exists "$p/.waypoint/conops-template.md" "CONOPS scaffold installed"
 exists "$p/.waypoint/skills/new-project.md" "core skills installed"
+exists "$p/.waypoint/skills/update-waypoint.md" "update skill installed"
 exists "$p/.claude/rules/waypoint.md" "Claude adapter installed"
 exists "$p/.waypoint/VERSION" "source revision stamped"
 for d in design plan features skills memory; do
@@ -141,47 +150,93 @@ else
 	ok "exits non-zero"
 fi
 
+# ─── Retired commands are stubs ──────────────────────────────────────────────
+
+start "update and update-skills are stubs that point at the skill"
+if run update; then no "update exits non-zero"; else ok "update exits non-zero"; fi
+said "update-waypoint" "update names the skill"
+if run update-skills; then no "update-skills exits non-zero"; else ok "update-skills exits non-zero"; fi
+said "update-waypoint" "update-skills names the skill"
+
+start "migrate is a stub that points at install"
+if run migrate; then no "exits non-zero"; else ok "exits non-zero"; fi
+said "folded into install" "says install migrates now"
+
 # ─── Ownership guarantees ────────────────────────────────────────────────────
 
-start "update leaves your OPORD alone"
+start "reinstall leaves an extended OPORD alone"
 p="$(project opord)"
 run install-claude "$p"
 echo "PROJECT-SPECIFIC RULE" >>"$p/.waypoint/opord.md"
-run update "$p"
-holds "$p/.waypoint/opord.md" "PROJECT-SPECIFIC RULE" "extension survives update"
-said "OPORD differs from the shipped baseline" "drift is reported"
+run install-claude "$p"
+holds "$p/.waypoint/opord.md" "PROJECT-SPECIFIC RULE" "extension survives reinstall"
+said "differs from the shipped baseline" "drift is reported"
+said "To merge the new baseline" "points at the merge skill"
 
-start "update leaves skills you wrote alone"
+start "reinstall leaves skills you wrote alone"
 p="$(project userskills)"
 run install-claude "$p"
 echo "MY DEPLOY PROCEDURE" >"$p/.waypoint/skills/deploy.md"
-run update "$p"
-holds "$p/.waypoint/skills/deploy.md" "MY DEPLOY PROCEDURE" "user skill survives update"
+run install-claude "$p"
+holds "$p/.waypoint/skills/deploy.md" "MY DEPLOY PROCEDURE" "user skill survives reinstall"
 
-start "update restores core skills you have edited"
+start "reinstall restores core skills you have edited"
 p="$(project coreskills)"
 run install-claude "$p"
 echo "local scribble" >"$p/.waypoint/skills/debug.md"
-run update "$p"
-holds "$p/.waypoint/skills/debug.md" "# Skill: Debug" "core skill refreshed"
-
-start "update-skills pulls the checkout before copying"
-p="$(project skillpull)"
 run install-claude "$p"
-echo "local scribble" >"$p/.waypoint/skills/debug.md"
-run update-skills "$p"
-said "Checking the Waypoint checkout" "checks the checkout first"
 holds "$p/.waypoint/skills/debug.md" "# Skill: Debug" "core skill refreshed"
 
-start "reinstall does not clobber an existing OPORD or project.md"
+start "reinstall does not clobber project.md"
 p="$(project reinstall)"
 run install-claude "$p"
-echo "PROJECT-SPECIFIC RULE" >>"$p/.waypoint/opord.md"
 echo "REAL PROJECT STATE" >"$p/.waypoint/project.md"
 run install-claude "$p"
-holds "$p/.waypoint/opord.md" "PROJECT-SPECIFIC RULE" "OPORD preserved"
 holds "$p/.waypoint/project.md" "REAL PROJECT STATE" "project.md preserved"
-said "(exists, skipped)" "says it skipped them"
+said "(exists, skipped)" "says it skipped it"
+
+# ─── OPORD fast-forward ──────────────────────────────────────────────────────
+
+oldrev="$(old_baseline_rev)"
+
+start "an unextended OPORD is fast-forwarded when the baseline moved"
+if [ -n "$oldrev" ]; then
+	p="$(project pristine)"
+	run install-claude "$p"
+	git -C "$ROOT" show "$oldrev:templates/opord.md" >"$p/.waypoint/opord.md"
+	printf 'revision: %s\nupdated:  2020-01-01\n' "$oldrev" >"$p/.waypoint/VERSION"
+	run install-claude "$p"
+	same "$p/.waypoint/opord.md" "$ROOT/templates/opord.md" "fast-forwarded to the current baseline"
+	said "fast-forwarded" "says so"
+else
+	ok "skipped — no prior baseline in history"
+	ok "skipped — no prior baseline in history"
+fi
+
+start "an extended OPORD is never fast-forwarded, even from a known baseline"
+if [ -n "$oldrev" ]; then
+	p="$(project extended)"
+	run install-claude "$p"
+	{
+		git -C "$ROOT" show "$oldrev:templates/opord.md"
+		echo "PROJECT-SPECIFIC RULE"
+	} >"$p/.waypoint/opord.md"
+	printf 'revision: %s\nupdated:  2020-01-01\n' "$oldrev" >"$p/.waypoint/VERSION"
+	run install-claude "$p"
+	holds "$p/.waypoint/opord.md" "PROJECT-SPECIFIC RULE" "extension survives"
+	said "left alone" "reports it was left alone"
+else
+	ok "skipped — no prior baseline in history"
+	ok "skipped — no prior baseline in history"
+fi
+
+start "an unknown stamped revision skips the fast-forward safely"
+p="$(project badrev)"
+run install-claude "$p"
+echo "PROJECT-SPECIFIC RULE" >>"$p/.waypoint/opord.md"
+printf 'revision: 0000000\nupdated:  2020-01-01\n' >"$p/.waypoint/VERSION"
+if run install-claude "$p"; then ok "reinstall still succeeds"; else no "reinstall still succeeds"; fi
+holds "$p/.waypoint/opord.md" "PROJECT-SPECIFIC RULE" "OPORD preserved"
 
 # ─── CONOPS scaffold lifecycle ───────────────────────────────────────────────
 
@@ -190,24 +245,22 @@ p="$(project conops)"
 run install-claude "$p"
 exists "$p/.waypoint/conops-template.md" "scaffold present before a CONOPS exists"
 echo "# CONOPS: Test" >"$p/.waypoint/conops.md"
-run update "$p"
+run install-claude "$p"
 absent "$p/.waypoint/conops-template.md" "scaffold removed after conops.md appears"
 holds "$p/.waypoint/conops.md" "# CONOPS: Test" "written CONOPS untouched"
 
 start "a written CONOPS keeps the scaffold from coming back"
-run update "$p"
-absent "$p/.waypoint/conops-template.md" "scaffold stays gone on repeat update"
 run install-claude "$p"
 absent "$p/.waypoint/conops-template.md" "scaffold stays gone on reinstall"
 said "CONOPS already written" "does not tell you to write one again"
 
-# ─── Migration ───────────────────────────────────────────────────────────────
+# ─── Legacy layouts ──────────────────────────────────────────────────────────
 
-start "a legacy memory.md is moved into memory/ rather than dropped"
+start "a legacy memory.md is moved into memory/ by install"
 p="$(project legacymem)"
 mkdir -p "$p/.waypoint"
 echo "OLD MEMORY CONTENT" >"$p/.waypoint/memory.md"
-run update "$p"
+run install-core "$p"
 absent "$p/.waypoint/memory.md" "old file no longer at the old path"
 found="$(grep -rlF "OLD MEMORY CONTENT" "$p/.waypoint/memory/" 2>/dev/null | head -1)"
 if [ -n "$found" ]; then ok "content preserved in memory/"; else no "content preserved in memory/"; fi
@@ -217,72 +270,48 @@ start "a briefing embedded in CLAUDE.md is relocated and reported"
 p="$(project legacyblock)"
 mkdir -p "$p/.waypoint"
 printf '# My Project\n\nSome rules.\n\n# Waypoint Session Briefing\nold block\n' >"$p/CLAUDE.md"
-run update "$p"
+run install-core "$p"
 exists "$p/.claude/rules/waypoint.md" "standalone rule file adopted"
 holds "$p/CLAUDE.md" "Some rules." "your CLAUDE.md is not rewritten"
 holds "$p/CLAUDE.md" "# Waypoint Session Briefing" "stale block left for you to remove"
 said "Legacy briefing block" "stale block is reported"
 
-start "migrate is idempotent"
+start "reinstall is idempotent"
 p="$(project idem)"
 run install-claude "$p"
 before="$(find "$p" -type f | sort)"
-run migrate "$p"
-run migrate "$p"
+run install-claude "$p"
+run install-claude "$p"
 after="$(find "$p" -type f | sort)"
 if [ "$before" = "$after" ]; then ok "file set unchanged"; else no "file set unchanged"; fi
 
-# ─── Revision stamp and change reporting ─────────────────────────────────────
+# ─── Revision stamp ──────────────────────────────────────────────────────────
 
-start "the revision stamp records the source commit"
+start "the revision stamp records the source commit and origin"
 p="$(project version)"
 run install-claude "$p"
 if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
 	rev="$(git -C "$ROOT" rev-parse --short HEAD)"
 	holds "$p/.waypoint/VERSION" "revision: $rev" "stamp matches the checkout"
+	url="$(git -C "$ROOT" remote get-url origin 2>/dev/null || true)"
+	if [ -n "$url" ]; then
+		holds "$p/.waypoint/VERSION" "origin:   $url" "stamp records the origin remote"
+	else
+		ok "skipped — checkout has no origin remote"
+	fi
 else
+	ok "skipped — not a git checkout"
 	ok "skipped — not a git checkout"
 fi
 
-start "update reports what changed since the stamped revision"
-p="$(project changes)"
-run install-claude "$p"
-run update "$p"
-said "What changed" "change section is shown"
-
-start "an unknown stamped revision is handled, not crashed on"
-p="$(project badrev)"
-run install-claude "$p"
-printf 'revision: 0000000\nupdated:  2020-01-01\n' >"$p/.waypoint/VERSION"
-if run update "$p"; then ok "update still succeeds"; else no "update still succeeds"; fi
-said "not in this checkout" "says the revision is unrecognised"
-
 # ─── Guards ──────────────────────────────────────────────────────────────────
-
-start "update refuses a project that was never installed into"
-p="$(project noinstall)"
-if run update "$p"; then
-	no "exits non-zero"
-else
-	ok "exits non-zero"
-fi
-said "Run install first" "says what to do instead"
-
-start "update-skills refuses a project that was never installed into"
-p="$(project noskillinstall)"
-if run update-skills "$p"; then
-	no "exits non-zero"
-else
-	ok "exits non-zero"
-fi
-said "Run install first" "says what to do instead"
 
 start "paths containing spaces work"
 p="$(project "spaced out")"
 run install-claude "$p"
 exists "$p/.waypoint/opord.md" "installs into a spaced path"
-run update "$p"
-exists "$p/.waypoint/skills/debug.md" "updates a spaced path"
+run install-claude "$p"
+exists "$p/.waypoint/skills/debug.md" "reinstalls into a spaced path"
 
 # ─── Dogfooding invariant ────────────────────────────────────────────────────
 
