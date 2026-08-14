@@ -9,6 +9,32 @@ affects those, merging is manual.
 
 ---
 
+## 2026-08-14
+
+- **Leaner session boot.** The OPORD's start-of-session read (§3a) no longer loads every
+  document each session. It reads the binding documents — `conops.md`, `project.md`, and the
+  most-recent `memory/` file — plus a cheap listing of `memory/`, `design/`, and `plan/` as an
+  index, and pulls design docs, plans, and older memory on demand. Growth in those folders no
+  longer lands in the mandatory boot. *Manual merge — §3a/§3d live in your OPORD.*
+- **Filenames are the memory index.** The memory convention now asks you to name each session
+  file for its subject and lead it with a one-line summary, so `ls` and `head -1` act as a
+  two-tier index. Adds a safe procedure for upgrading a weak name and a policy for archiving old
+  sessions instead of keeping everything verbatim forever.
+- **Single-sourcing.** New OPORD duty: define a fact once and reference it elsewhere. The CONOPS
+  now points at the OPORD for phase definitions and ongoing duties instead of restating them.
+  *Manual merge if you extended OPORD §3d.*
+- **The changelog has a defined audience.** New OPORD duty wording: `CHANGELOG.md` is the
+  human-facing record, written in plain release-notes style for a person scanning what changed
+  between updates; the framework's own record is `project.md` and `memory/`. *Manual merge —
+  §3d.*
+- **Feature docs are as-built records.** The §3d duty now says a feature doc describes the
+  capability as it exists today and stays current; the design that produced it stays frozen as
+  the decision record. Also new in the tone duty: use em dashes sparingly. *Manual merge — §3d.*
+- **`update-skills` now pulls the checkout first**, like `install` and `update`, so a stale
+  checkout can't quietly install stale skills.
+- Added a test asserting the dogfooded `.waypoint/` stays byte-identical to the shipped
+  templates, so editing one copy can't silently drift from the other.
+
 ## 2026-07-28
 
 - **`install` and `update` now pull the Waypoint checkout first.** Previously an

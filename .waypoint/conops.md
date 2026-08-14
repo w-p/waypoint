@@ -103,21 +103,14 @@ The project is now ready for structured development.
 
 ### 5b. Phase-gated workflow
 
-Work proceeds through three sequential phases. The current phase is recorded in `project.md` and is the primary signal for what kind of work is appropriate right now.
+Work proceeds through three sequential phases — Ideation, Planning, Execution — defined in OPORD §3b (what each phase is fed by and what it outputs). The current phase is recorded in `project.md` and is the primary signal for what kind of work is appropriate right now.
 
-**Phase 1 — Ideation and Refinement**
+What this section adds is the governance around those phases:
 
-The design phase. Ideas are raised, debated, and accepted or discarded. Focus is on requirements, possibilities, risks, and tradeoffs. The AI does not write production code here. The phase concludes when the design is settled and recorded in `design/`. The developer approves the design explicitly before the project advances.
-
-**Phase 2 — Planning**
-
-Define the work: what needs to be done, in what order, and by what roles if relevant. The AI does not write production code here either. The phase concludes when the plan is recorded in `plan/` and the developer approves it.
-
-**Phase 3 — Execution**
-
-Build, test, and document. The AI works from the approved plan, surfacing blockers or discovered complexity rather than resolving them unilaterally. On completion, the feature is documented in `features/`, `project.md` is updated, and the session's file in `memory/` receives a dated entry summarizing what was built and any decisions made during execution.
-
-Phases are sequential. A project in Execution that discovers a significant design gap returns to Ideation for that scope — it does not extend the plan unilaterally.
+- **No production code is written in Ideation or Planning.** Those phases produce a design (`design/`) and a plan (`plan/`) respectively.
+- **The developer approves each transition explicitly** — a design before Planning begins, a plan before Execution begins.
+- **Execution surfaces blockers** rather than resolving them unilaterally. On completion, the feature is documented in `features/`, `project.md` is updated, and the session's `memory/` file records what was built and why.
+- **Phases are sequential.** A project in Execution that discovers a significant design gap returns to Ideation for that scope — it does not extend the plan unilaterally.
 
 ### 5c. Entry points
 
@@ -134,16 +127,11 @@ Each of the following activities is covered by a skill document in `.waypoint/sk
 
 ### 5d. Ongoing duties
 
-The AI assistant has standing duties that apply continuously across all phases. These are defined in detail in `opord.md` and repeated here for visibility:
-
-- **Memory** — After meaningful changes or conversations, record a dated entry in the session's file under `memory/` (one file per session). Entries are written for a future reader who has lost all prior context. Brief but complete.
-- **Project state** — Keep `project.md` current: the active phase, what has shipped, what is deferred, and where the ground truth documents are.
-- **Feature documentation** — When a feature is shipped, produce an as-built document in `features/` before closing the work.
-- **Design records** — When a significant architectural decision is made during Ideation, record it in `design/` before advancing.
+The AI assistant has standing duties that apply continuously across all phases — maintaining memory, keeping `project.md` current, documenting shipped features, and recording design decisions during Ideation. These are defined in OPORD §3d, which owns them; they are not restated here.
 
 ### 5e. Session start
 
-On every new session start, the AI reads `opord.md` first. The OPORD tells it what else to read and in what order, depending on the current phase. This is enforced through the vendor adapter for the tool in use. The adapter's sole job is to ensure this happens automatically.
+On every new session start, the AI reads `opord.md` first. Its Pre-Action Checklist (§3a) governs the rest of the boot: the binding documents and a map of the narrative folders are read every session, and everything else is pulled on demand. This is enforced through the vendor adapter for the tool in use. The adapter's sole job is to ensure this happens automatically.
 
 ---
 

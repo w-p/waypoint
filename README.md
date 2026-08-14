@@ -115,6 +115,17 @@ need to merge by hand.
 
 Changing the installer? `./test.sh` covers what `update` promises not to touch.
 
+## Using Waypoint well
+
+Keeping `project.md` current and memory well-named is the assistant's job, not yours — that's
+the point. Your part is small:
+
+- **Start a fresh chat for a new task.** A long-running chat carries its whole history forward
+  and re-pays for it every turn. Waypoint exists so a fresh session comes up to speed in
+  seconds — use it instead of nursing one endless thread.
+- **Turn off tools you aren't using.** Idle integrations (MCP servers and the like) spend
+  tokens describing themselves on every request whether or not you use them.
+
 ## What Waypoint doesn't do
 
 It doesn't touch execution mechanics — no TDD enforcement, no git or branching strategy,

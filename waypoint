@@ -19,9 +19,9 @@
 #
 # dest is the project root to install/update. Defaults to the current directory.
 #
-# install and update pull this checkout first, so you install what is actually
-# current rather than whatever you last happened to fetch. WAYPOINT_NO_PULL=1
-# disables that for offline use.
+# install, update, and update-skills pull this checkout first, so you install
+# what is actually current rather than whatever you last happened to fetch.
+# WAYPOINT_NO_PULL=1 disables that for offline use.
 
 set -euo pipefail
 
@@ -217,6 +217,13 @@ migrate() {
 # and carry on with the files as they are. Set WAYPOINT_NO_PULL=1 to skip
 # entirely (offline use, and the test suite, which must not touch your checkout).
 pull_source() {
+	# At most once per invocation — update pulls before refreshing skills, and
+	# update_skills pulls when run standalone; the second call must not repeat it.
+	if [ -n "${PULLED:-}" ]; then
+		return
+	fi
+	PULLED=1
+
 	echo ""
 	echo "→ Checking the Waypoint checkout..."
 
@@ -327,6 +334,9 @@ update_skills() {
 		echo "  Error: $wp/skills does not exist. Run install first." >&2
 		exit 1
 	fi
+
+	pull_source
+
 	echo ""
 	echo "→ Updating core skills..."
 	local f

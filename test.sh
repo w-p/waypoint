@@ -68,6 +68,12 @@ holds() {
 	if grep -qF "$2" "$1" 2>/dev/null; then ok "$3"; else no "$3"; fi
 }
 
+# Assert two files are byte-identical. Used for the dogfooding invariant: the
+# framework's own .waypoint/ must match the templates it ships.
+same() {
+	if diff -q "$1" "$2" >/dev/null 2>&1; then ok "$3"; else no "$3 — $1 and $2 differ"; fi
+}
+
 # Assert the last captured output contains a fixed string.
 said() {
 	if echo "$OUTPUT" | grep -qF "$1"; then ok "$2"; else no "$2"; fi
@@ -157,6 +163,14 @@ p="$(project coreskills)"
 run install-claude "$p"
 echo "local scribble" >"$p/.waypoint/skills/debug.md"
 run update "$p"
+holds "$p/.waypoint/skills/debug.md" "# Skill: Debug" "core skill refreshed"
+
+start "update-skills pulls the checkout before copying"
+p="$(project skillpull)"
+run install-claude "$p"
+echo "local scribble" >"$p/.waypoint/skills/debug.md"
+run update-skills "$p"
+said "Checking the Waypoint checkout" "checks the checkout first"
 holds "$p/.waypoint/skills/debug.md" "# Skill: Debug" "core skill refreshed"
 
 start "reinstall does not clobber an existing OPORD or project.md"
@@ -254,12 +268,30 @@ else
 fi
 said "Run install first" "says what to do instead"
 
+start "update-skills refuses a project that was never installed into"
+p="$(project noskillinstall)"
+if run update-skills "$p"; then
+	no "exits non-zero"
+else
+	ok "exits non-zero"
+fi
+said "Run install first" "says what to do instead"
+
 start "paths containing spaces work"
 p="$(project "spaced out")"
 run install-claude "$p"
 exists "$p/.waypoint/opord.md" "installs into a spaced path"
 run update "$p"
 exists "$p/.waypoint/skills/debug.md" "updates a spaced path"
+
+# ─── Dogfooding invariant ────────────────────────────────────────────────────
+
+# Waypoint tracks its own development, so its .waypoint/ is a live install of the
+# templates it ships. Those pairs must stay byte-identical — editing one copy and
+# forgetting the other is exactly the drift this catches.
+start "the dogfooded .waypoint/ matches the shipped templates"
+same "$ROOT/templates/opord.md" "$ROOT/.waypoint/opord.md" "OPORD matches its template"
+same "$ROOT/templates/memory.md" "$ROOT/.waypoint/memory/README.md" "memory README matches its template"
 
 # ─── Result ──────────────────────────────────────────────────────────────────
 
