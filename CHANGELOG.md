@@ -23,6 +23,11 @@ affects those, merging is manual.
 - **Single-sourcing.** New OPORD duty: define a fact once and reference it elsewhere. The CONOPS
   now points at the OPORD for phase definitions and ongoing duties instead of restating them.
   *Manual merge if you extended OPORD §3d.*
+- **New duty: no paths outside the repo.** Documents must not reference filesystem
+  locations that won't exist for the next person — another checkout, a home directory, a
+  machine-local install. When a source repository matters, its remote URL is the durable
+  reference (`VERSION`'s `origin:`). *Manual merge — §3d — unless your OPORD is
+  unextended, in which case reinstall fast-forwards it.*
 - **The changelog has a defined audience.** New OPORD duty wording: `CHANGELOG.md` is the
   human-facing record, written in plain release-notes style for a person scanning what changed
   between updates; the framework's own record is `project.md` and `memory/`. *Manual merge —
