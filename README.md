@@ -99,7 +99,9 @@ and merges OPORD baseline changes into your extended copy with you reviewing the
 That last part is the reason it's a skill: merging prose takes judgment a script doesn't
 have.
 
-The mechanical half is plain reinstalling, safe to run directly any time:
+The mechanical half is plain reinstalling, safe to run directly any time — `waypoint
+update` does exactly that with your adapter detected for you. On a project installed
+before this skill existed, run it once; the reinstall lays the skill down:
 
 - **The checkout is pulled first**, so you get what's actually current rather than
   whatever you last happened to fetch. If it has local edits, is on a detached HEAD, has

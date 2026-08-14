@@ -1,7 +1,8 @@
 # Design: Skill-driven update
 
-**Status:** Executed 2026-08-14 — shipped to the working tree via the plan at
-`.waypoint/plan/2026-08-14-skill-driven-update.md`. One deviation: `pull_source`'s
+**Status:** Executed 2026-08-14 — shipped via the plan at
+`.waypoint/plan/2026-08-14-skill-driven-update.md`, then revised the same day after a
+field report (§6): `update` returned as a real command. One deviation: `pull_source`'s
 once-per-run guard was removed rather than kept, since install is now its only caller.
 Session record: `.waypoint/memory/2026-08-14-boot-cost-and-memory-optimization.md`.
 **Scope:** The update path (CLI and skill), VERSION provenance, and the standing-checkout
@@ -114,7 +115,19 @@ Shipped as a core skill, so every update refreshes the update procedure itself. 
 
 ---
 
-## 6. Sequencing (proposed, pending approval)
+## 6. Revision — 2026-08-14 field report
+
+Stubbing `update` had a bootstrap hole that §4 papered over: a project installed before
+this change has no `update-waypoint` skill, and the stub pointed at exactly that missing
+file. `update` is therefore back as a real command — the adapter-detected reinstall, the
+mechanical half of the skill's procedure — ending with a pointer at the skill, which by
+then exists because the reinstall just installed it. It also keeps every old README's
+instructions working. `update-skills` and `migrate` remain stubs; `update-skills` points
+at `update`.
+
+---
+
+## 7. Sequencing (proposed, pending approval)
 
 1. `origin:` in VERSION. Tiny and independent.
 2. Install semantics: refresh core skills, fold in migrate, add stubs, retire dead code

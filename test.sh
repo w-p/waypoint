@@ -150,17 +150,39 @@ else
 	ok "exits non-zero"
 fi
 
-# ─── Retired commands are stubs ──────────────────────────────────────────────
+# ─── update: the mechanical half, and the bootstrap for the skill ────────────
 
-start "update and update-skills are stubs that point at the skill"
-if run update; then no "update exits non-zero"; else ok "update exits non-zero"; fi
-said "update-waypoint" "update names the skill"
+start "update refuses a project that was never installed into"
+p="$(project noinstall)"
+if run update "$p"; then
+	no "exits non-zero"
+else
+	ok "exits non-zero"
+fi
+said "Run install first" "says what to do instead"
+
+start "update reinstalls, which installs the update skill itself"
+p="$(project updcmd)"
+run install-claude "$p"
+rm "$p/.waypoint/skills/update-waypoint.md"
+echo "local scribble" >"$p/.waypoint/skills/debug.md"
+run update "$p"
+exists "$p/.waypoint/skills/update-waypoint.md" "a pre-skill project gets the skill from update"
+holds "$p/.waypoint/skills/debug.md" "# Skill: Debug" "core skill refreshed"
+said "Read .waypoint/skills/update-waypoint.md" "points at the skill for the rest"
+
+start "update detects the adapter and stays in its lane"
+p="$(project updcursor)"
+run install-cursor "$p"
+run update "$p"
+exists "$p/.cursor/rules/session-briefing.mdc" "cursor adapter refreshed"
+absent "$p/.claude" "no Claude adapter appears"
+
+start "update-skills and migrate are stubs"
 if run update-skills; then no "update-skills exits non-zero"; else ok "update-skills exits non-zero"; fi
-said "update-waypoint" "update-skills names the skill"
-
-start "migrate is a stub that points at install"
-if run migrate; then no "exits non-zero"; else ok "exits non-zero"; fi
-said "folded into install" "says install migrates now"
+said "waypoint update" "update-skills points at update"
+if run migrate; then no "migrate exits non-zero"; else ok "migrate exits non-zero"; fi
+said "folded into install" "migrate says install migrates now"
 
 # ─── Ownership guarantees ────────────────────────────────────────────────────
 

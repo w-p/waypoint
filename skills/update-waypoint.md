@@ -21,7 +21,7 @@ can do safely.
 ## When to Use
 
 - The developer asks to update Waypoint
-- `waypoint update` was run and pointed here (it is a stub)
+- `waypoint update` was just run (it performs the reinstall and points here for the rest)
 - A framework file is known to be stale relative to the source
 
 Never run this against the Waypoint repository itself. That repo maintains its templates

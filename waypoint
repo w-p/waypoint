@@ -12,13 +12,15 @@
 #   install-core     Templates and skills only (no editor adapter)
 #   install-claude   install-core + Claude Code adapter (.claude/rules/waypoint.md)
 #   install-cursor   install-core + Cursor adapter (.cursor/rules/session-briefing.mdc)
+#   update           Adapter-detected reinstall; refreshes the framework files
 #   help             Show this message
 #
-# Reinstalling is also how framework files are refreshed: it updates everything
+# Reinstalling is how framework files are refreshed: it updates everything
 # framework-owned (core skills, adapter, memory README), heals legacy layouts,
-# and never touches project-owned files. Updating a project end to end is the
-# update-waypoint skill's job; the old update/update-skills/migrate commands
-# are stubs that say so.
+# and never touches project-owned files. `update` is that reinstall with the
+# adapter detected for you, and the bootstrap for projects that predate the
+# update-waypoint skill. The skill is the full update path; update-skills and
+# migrate are stubs that say so.
 #
 # dest is the project root to install into. Defaults to the current directory.
 #
@@ -175,6 +177,31 @@ install_cursor() {
 	echo ""
 }
 
+# update — the mechanical half of an update: a reinstall with the adapter
+# detected from the installed rule file. Kept as a real command rather than a
+# stub because a project installed before the update-waypoint skill existed has
+# no skill to invoke yet; this command is how it gets one. The skill is the
+# full update path — it adds change narration and the OPORD merge on top of
+# exactly this reinstall.
+update_cmd() {
+	local dest="$1" wp="$1/.waypoint"
+	if [ ! -d "$wp" ]; then
+		echo "  Error: $wp does not exist. Run install first." >&2
+		exit 1
+	fi
+	if [ -f "$dest/.claude/rules/waypoint.md" ]; then
+		install_claude "$dest"
+	elif [ -f "$dest/.cursor/rules/session-briefing.mdc" ]; then
+		install_cursor "$dest"
+	else
+		install_core "$dest"
+	fi
+	echo "  That refreshed the framework files. For the full update — what changed,"
+	echo "  and merging OPORD baseline changes — use the skill (just refreshed):"
+	echo "    Read .waypoint/skills/update-waypoint.md and follow it."
+	echo ""
+}
+
 # ─── Claude adapter (standalone rule file, like the Cursor adapter) ──────────
 
 # The Claude briefing is a plain rule file that loads every session. Install is
@@ -328,6 +355,7 @@ usage() {
     install-cursor    Install with Cursor adapter
     install-claude    Install with Claude Code adapter
     install-core      Install templates and skills only (no adapter)
+    update            Refresh the framework files (adapter-detected reinstall)
 
   Usage:
     $0 <command> [dest]
@@ -357,14 +385,10 @@ case "$cmd" in
 		usage
 		exit 0
 		;;
-	update|update-skills)
-		echo "Error: '$cmd' is no longer a script command — updating is a skill." >&2
+	update-skills)
+		echo "Error: 'update-skills' is gone — core skills refresh as part of reinstall:" >&2
 		echo "" >&2
-		echo "Tell your assistant:" >&2
-		echo "  Read .waypoint/skills/update-waypoint.md and follow it." >&2
-		echo "" >&2
-		echo "It finds your Waypoint source, reinstalls the framework files, reports" >&2
-		echo "what changed, and merges OPORD baseline changes with your review." >&2
+		echo "  $0 update [dest]" >&2
 		exit 1
 		;;
 	migrate)
@@ -402,6 +426,7 @@ case "$cmd" in
 	install-core)   install_core "$dest" ;;
 	install-claude) install_claude "$dest" ;;
 	install-cursor) install_cursor "$dest" ;;
+	update)         update_cmd "$dest" ;;
 	*)
 		echo "Unknown command: $cmd" >&2
 		usage >&2
