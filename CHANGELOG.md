@@ -9,6 +9,34 @@ affects those, merging is manual.
 
 ---
 
+## 2026-08-31
+
+- **Hooks: the important rules are now delivered and gated, not just written down.**
+  Both adapters install small shell scripts into your editor's hooks directory. Claude
+  Code: the standing rules are injected at every session start and again after each
+  context compaction (an automatic re-brief), a short reminder rides every prompt, a
+  phase gate denies file edits and file-writing shell commands outside `.waypoint/`
+  during Ideation and Planning, and if the tree changed but no memory entry was written
+  the session is reminded once before it ends. Cursor: the standing rules ride the
+  always-applied rule (re-sent every request), session start injects them too, a shell
+  gate and an edit watcher cover the phase gate, and the same memory reminder applies.
+  Wiring lives in `.claude/settings.json` / `.cursor/hooks.json` — created if absent,
+  merged via `jq` if present, printed for you to paste otherwise. Lift a phase gate for
+  a session with `WAYPOINT_PHASE_GATE=off`. An opt-in Claude hook can block interactive
+  question prompts; the README shows the entry.
+- **The OPORD gains a standing-rules region** — the always-on rules, between
+  `<!-- standing-rules:begin/end -->` markers at the end of the document. The installer
+  copies the region into your editor's rule file on every install, and a drift test
+  keeps the copies identical. Extend the region and the extension rides along.
+- **Voice moved into its own section (§3f)** with checkable rules: plain language a
+  cold reader can parse, no narrated candor, no personal names, sparing em dashes, and
+  a register boundary — the OPORD's format terms stay inside the OPORD; everything the
+  assistant writes is plain. §3c was retitled "Approval and Confirmation". The
+  `**Phase:**` line in `project.md` is now machine-read: keep exactly one.
+- **By hand, if your OPORD is extended:** the region, §3f, the §3c title, and the
+  phase-line spec are baseline changes — run the update-waypoint skill to merge them.
+  An unextended OPORD fast-forwards automatically on install.
+
 ## 2026-08-14
 
 - **Leaner session boot.** The OPORD's start-of-session read (§3a) no longer loads every

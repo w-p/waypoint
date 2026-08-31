@@ -10,8 +10,8 @@
 #
 # Commands:
 #   install-core     Templates and skills only (no editor adapter)
-#   install-claude   install-core + Claude Code adapter (.claude/rules/waypoint.md)
-#   install-cursor   install-core + Cursor adapter (.cursor/rules/session-briefing.mdc)
+#   install-claude   install-core + Claude Code adapter (rule file + hooks)
+#   install-cursor   install-core + Cursor adapter (rule file + hooks)
 #   update           Adapter-detected reinstall; refreshes the framework files
 #   help             Show this message
 #
@@ -78,6 +78,7 @@ install_core() {
 	done
 
 	write_revision "$dest"
+	compose_rule_files "$dest"
 
 	echo ""
 	if [ -f "$wp/conops.md" ]; then
@@ -158,6 +159,8 @@ install_claude() {
 	echo "→ Installing Claude Code adapter..."
 	install_claude_rule "$dest"
 	echo "  + .claude/rules/waypoint.md"
+	compose_rule_files "$dest"
+	install_claude_hooks "$dest"
 	echo ""
 	echo "✓ Done. In a new Claude Code session: no request → 'Ready.';"
 	echo "  a question → it comes up to speed and answers it."
@@ -171,6 +174,8 @@ install_cursor() {
 	mkdir -p "$dest/.cursor/rules"
 	cp "$ADAPTERS/cursor/rules/session-briefing.mdc" "$dest/.cursor/rules/session-briefing.mdc"
 	echo "  + .cursor/rules/session-briefing.mdc"
+	compose_rule_files "$dest"
+	install_cursor_hooks "$dest"
 	echo ""
 	echo "✓ Done. In a new Cursor session: no request → 'Ready.';"
 	echo "  a question → it comes up to speed and answers it."
@@ -210,6 +215,139 @@ install_claude_rule() {
 	local dest="$1"
 	mkdir -p "$dest/.claude/rules"
 	cp "$ADAPTERS/claude/rules/waypoint.md" "$dest/.claude/rules/waypoint.md"
+}
+
+# ─── Standing rules and hooks ────────────────────────────────────────────────
+
+# The standing rules live in a marked region of the project's OPORD. Every
+# adapter rule file carries a copy, spliced in at install time, so the editor
+# re-sends those rules with every session instead of relying on the model to
+# go read them. Recomposing on every install is what keeps the copy identical
+# to the OPORD's region rather than drifting.
+compose_standing_rules() {
+	local opord="$1" rule="$2" region tmp
+	[ -f "$opord" ] || return 0
+	[ -f "$rule" ] || return 0
+	region="$(mktemp)"
+	awk '/<!-- standing-rules:begin -->/{f=1} f{print} /<!-- standing-rules:end -->/{f=0}' "$opord" >"$region"
+	tmp="$(mktemp)"
+	if [ -s "$region" ]; then
+		awk -v rf="$region" '
+			/<!-- waypoint:standing-rules -->/ { while ((getline l < rf) > 0) print l; next }
+			/<!-- standing-rules:begin -->/    { while ((getline l < rf) > 0) print l; skip=1; next }
+			/<!-- standing-rules:end -->/      { skip=0; next }
+			skip { next }
+			{ print }
+		' "$rule" >"$tmp"
+		mv "$tmp" "$rule"
+	else
+		awk '
+			/<!-- waypoint:standing-rules -->/ { print "(No standing-rules region found in .waypoint/opord.md — merge the latest baseline: read .waypoint/skills/update-waypoint.md and follow it.)"; next }
+			{ print }
+		' "$rule" >"$tmp"
+		mv "$tmp" "$rule"
+		echo "  ! .waypoint/opord.md has no standing-rules region; the rule file points"
+		echo "    at the update-waypoint skill instead. Merge the new baseline to fix this."
+	fi
+	rm -f "$region"
+}
+
+# Compose whichever adapter rule files are present. Runs at the end of every
+# install so a core-only reinstall still refreshes the copies.
+compose_rule_files() {
+	local dest="$1" opord="$1/.waypoint/opord.md"
+	if [ -f "$dest/.claude/rules/waypoint.md" ]; then
+		compose_standing_rules "$opord" "$dest/.claude/rules/waypoint.md"
+	fi
+	if [ -f "$dest/.cursor/rules/session-briefing.mdc" ]; then
+		compose_standing_rules "$opord" "$dest/.cursor/rules/session-briefing.mdc"
+	fi
+}
+
+# Hook scripts are framework-owned and named waypoint-*.sh, so refreshing them
+# wholesale can never touch a hook the developer wrote. The wiring file is the
+# one file here the project may already own: created when absent, merged with
+# jq when present, and otherwise printed for the developer to paste — never
+# blind-edited.
+install_claude_hooks() {
+	local dest="$1" hooks="$dest/.claude/hooks" settings="$dest/.claude/settings.json"
+	local frag="$ADAPTERS/claude/hooks-settings.json" f tmp
+	mkdir -p "$hooks"
+	for f in "$ADAPTERS"/claude/hooks/waypoint-*.sh; do
+		cp "$f" "$hooks/$(basename "$f")"
+		chmod +x "$hooks/$(basename "$f")"
+	done
+	echo "  ✓ .claude/hooks/waypoint-*.sh"
+	if [ ! -f "$settings" ]; then
+		cp "$frag" "$settings"
+		echo "  + .claude/settings.json  (hook wiring)"
+	elif command -v jq >/dev/null 2>&1; then
+		tmp="$(mktemp)"
+		if jq --slurpfile frag "$frag" '
+			. as $cur
+			| .hooks = ((.hooks // {}) + ($frag[0].hooks | with_entries(
+				.key as $k
+				| .value = ((($cur.hooks[$k] // []) | map(select(
+					(([.hooks[]?.command // empty] | map(contains("/waypoint-")) | any)) | not
+				))) + .value)
+			)))' "$settings" >"$tmp" 2>/dev/null; then
+			mv "$tmp" "$settings"
+			echo "  ✓ .claude/settings.json  (waypoint hook entries merged)"
+		else
+			rm -f "$tmp"
+			echo "  ! .claude/settings.json is not valid JSON — could not merge the hook"
+			echo "    wiring. Fix the file, then add this to it by hand:"
+			sed 's/^/      /' "$frag"
+		fi
+	elif grep -qF "/waypoint-" "$settings"; then
+		echo "  ✓ .claude/settings.json  (waypoint hooks already wired; jq not found, so"
+		echo "    the entries were not refreshed)"
+	else
+		echo "  ! .claude/settings.json exists and jq is not available to merge into it."
+		echo "    Add this to it by hand:"
+		sed 's/^/      /' "$frag"
+	fi
+}
+
+install_cursor_hooks() {
+	local dest="$1" hooks="$dest/.cursor/hooks" config="$dest/.cursor/hooks.json"
+	local frag="$ADAPTERS/cursor/hooks-config.json" f tmp
+	mkdir -p "$hooks"
+	for f in "$ADAPTERS"/cursor/hooks/waypoint-*.sh; do
+		cp "$f" "$hooks/$(basename "$f")"
+		chmod +x "$hooks/$(basename "$f")"
+	done
+	echo "  ✓ .cursor/hooks/waypoint-*.sh"
+	if [ ! -f "$config" ]; then
+		cp "$frag" "$config"
+		echo "  + .cursor/hooks.json  (hook wiring)"
+	elif command -v jq >/dev/null 2>&1; then
+		tmp="$(mktemp)"
+		if jq --slurpfile frag "$frag" '
+			. as $cur
+			| .version = (.version // 1)
+			| .hooks = ((.hooks // {}) + ($frag[0].hooks | with_entries(
+				.key as $k
+				| .value = ((($cur.hooks[$k] // []) | map(select(
+					((.command // "") | contains("/waypoint-")) | not
+				))) + .value)
+			)))' "$config" >"$tmp" 2>/dev/null; then
+			mv "$tmp" "$config"
+			echo "  ✓ .cursor/hooks.json  (waypoint hook entries merged)"
+		else
+			rm -f "$tmp"
+			echo "  ! .cursor/hooks.json is not valid JSON — could not merge the hook"
+			echo "    wiring. Fix the file, then add this to it by hand:"
+			sed 's/^/      /' "$frag"
+		fi
+	elif grep -qF "/waypoint-" "$config"; then
+		echo "  ✓ .cursor/hooks.json  (waypoint hooks already wired; jq not found, so"
+		echo "    the entries were not refreshed)"
+	else
+		echo "  ! .cursor/hooks.json exists and jq is not available to merge into it."
+		echo "    Add this to it by hand:"
+		sed 's/^/      /' "$frag"
+	fi
 }
 
 # True if a pre-rules install embedded the briefing directly in a CLAUDE.md.

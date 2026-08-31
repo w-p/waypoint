@@ -13,3 +13,5 @@ Then engage with the user's first message:
 - **If there is no request yet** — just a greeting or session opener — reply only with **"Ready."**
 
 Either way, no document summaries and no meta-commentary. Get oriented, then respond to what was actually asked.
+
+<!-- waypoint:standing-rules -->

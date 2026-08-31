@@ -95,6 +95,21 @@ old_baseline_rev() {
 	git -C "$ROOT" log --format=%h --skip=1 -1 -- templates/opord.md 2>/dev/null
 }
 
+# The standing-rules region of a file, markers included.
+region_of() {
+	awk '/<!-- standing-rules:begin -->/{f=1} f{print} /<!-- standing-rules:end -->/{f=0}' "$1"
+}
+
+# Assert a shipped surface (everything outside the OPORD and CONOPS) does not
+# use one of the OPORD's format terms.
+no_leak() {
+	if grep -rqF "$1" "$ROOT/skills" "$ROOT/templates/project.md" "$ROOT/templates/memory.md" "$ROOT/templates/conops.md" "$ROOT/adapters" 2>/dev/null; then
+		no "'$1' stays out of shipped surfaces"
+	else
+		ok "'$1' stays out of shipped surfaces"
+	fi
+}
+
 # ─── Install ─────────────────────────────────────────────────────────────────
 
 start "fresh install lays down the full structure"
@@ -335,6 +350,159 @@ exists "$p/.waypoint/opord.md" "installs into a spaced path"
 run install-claude "$p"
 exists "$p/.waypoint/skills/debug.md" "reinstalls into a spaced path"
 
+# ─── Standing rules composition ──────────────────────────────────────────────
+
+start "the adapter rule file carries the OPORD's standing rules"
+p="$(project rules)"
+run install-claude "$p"
+r_opord="$(region_of "$p/.waypoint/opord.md")"
+r_rule="$(region_of "$p/.claude/rules/waypoint.md")"
+if [ -n "$r_opord" ] && [ "$r_opord" = "$r_rule" ]; then ok "rule file region matches the OPORD"; else no "rule file region matches the OPORD"; fi
+awk '{ if ($0 == "<!-- standing-rules:end -->") print "- **Extra** — a project rule."; print }' "$p/.waypoint/opord.md" >"$p/.waypoint/opord.md.new"
+mv "$p/.waypoint/opord.md.new" "$p/.waypoint/opord.md"
+run install-claude "$p"
+holds "$p/.claude/rules/waypoint.md" "a project rule." "an extended region propagates on reinstall"
+r_opord="$(region_of "$p/.waypoint/opord.md")"
+r_rule="$(region_of "$p/.claude/rules/waypoint.md")"
+if [ "$r_opord" = "$r_rule" ]; then ok "copies stay identical after the extension"; else no "copies stay identical after the extension"; fi
+
+start "the cursor rule file carries the standing rules too"
+p="$(project rulescursor)"
+run install-cursor "$p"
+r_opord="$(region_of "$p/.waypoint/opord.md")"
+r_rule="$(region_of "$p/.cursor/rules/session-briefing.mdc")"
+if [ -n "$r_opord" ] && [ "$r_opord" = "$r_rule" ]; then ok "mdc region matches the OPORD"; else no "mdc region matches the OPORD"; fi
+
+start "an OPORD without the region gets a pointer, not a broken rule file"
+p="$(project noregion)"
+run install-core "$p"
+grep -v 'standing-rules' "$p/.waypoint/opord.md" >"$p/.waypoint/opord.md.new"
+mv "$p/.waypoint/opord.md.new" "$p/.waypoint/opord.md"
+run install-claude "$p"
+said "no standing-rules region" "the gap is reported"
+holds "$p/.claude/rules/waypoint.md" "update-waypoint" "the rule file points at the merge skill"
+
+# ─── Adapter hooks: install and wiring ───────────────────────────────────────
+
+start "claude hooks are installed and wired"
+p="$(project hooks)"
+run install-claude "$p"
+for h in session-start user-prompt phase-gate shell-gate memory-backstop question-gate; do
+	if [ -x "$p/.claude/hooks/waypoint-$h.sh" ]; then ok "waypoint-$h.sh installed executable"; else no "waypoint-$h.sh installed executable"; fi
+done
+exists "$p/.claude/settings.json" "settings.json created"
+holds "$p/.claude/settings.json" "waypoint-session-start.sh" "session-start wired"
+if grep -qF "question-gate" "$p/.claude/settings.json"; then no "question gate stays unwired by default"; else ok "question gate stays unwired by default"; fi
+n1="$(grep -c 'waypoint-session-start.sh' "$p/.claude/settings.json")"
+run install-claude "$p"
+n2="$(grep -c 'waypoint-session-start.sh' "$p/.claude/settings.json")"
+if [ "$n1" = "$n2" ]; then ok "re-wiring is idempotent"; else no "re-wiring is idempotent — $n1 then $n2 entries"; fi
+
+start "hook wiring merges into existing settings without clobbering"
+p="$(project hookmerge)"
+mkdir -p "$p/.claude"
+printf '{"permissions":{"allow":["Bash(ls *)"]},"hooks":{"Stop":[{"hooks":[{"type":"command","command":"echo mine"}]}]}}' >"$p/.claude/settings.json"
+run install-claude "$p"
+if command -v jq >/dev/null 2>&1; then
+	holds "$p/.claude/settings.json" "echo mine" "the project's own Stop hook survives"
+	holds "$p/.claude/settings.json" "waypoint-memory-backstop.sh" "the waypoint Stop hook is added"
+	holds "$p/.claude/settings.json" "Bash(ls *)" "permissions untouched"
+	if jq -e . "$p/.claude/settings.json" >/dev/null 2>&1; then ok "result is valid JSON"; else no "result is valid JSON"; fi
+else
+	holds "$p/.claude/settings.json" "echo mine" "without jq the file is not modified"
+	if grep -qF "waypoint-" "$p/.claude/settings.json"; then no "without jq nothing is written into it"; else ok "without jq nothing is written into it"; fi
+	said "by hand" "the fragment is printed for manual wiring"
+	ok "skipped — jq not available for merge assertion"
+fi
+
+# ─── Adapter hooks: behavior ─────────────────────────────────────────────────
+
+start "the session-start hook delivers rules, phase, and boot instruction"
+p="$(project hookrun)"
+run install-claude "$p"
+out="$(CLAUDE_PROJECT_DIR="$p" sh "$p/.claude/hooks/waypoint-session-start.sh")"
+case "$out" in *"Standing rules"*) ok "standing rules delivered";; *) no "standing rules delivered";; esac
+case "$out" in *"**Phase:**"*) ok "phase line delivered";; *) no "phase line delivered";; esac
+case "$out" in *"boot checklist"*) ok "boot instruction delivered";; *) no "boot instruction delivered";; esac
+out="$(CLAUDE_PROJECT_DIR="$p" sh "$p/.claude/hooks/waypoint-session-start.sh" compact)"
+case "$out" in *"compacted"*) ok "compact variant delivers the recovery instruction";; *) no "compact variant delivers the recovery instruction";; esac
+
+start "the user-prompt hook emits additionalContext JSON"
+out="$(CLAUDE_PROJECT_DIR="$p" sh "$p/.claude/hooks/waypoint-user-prompt.sh")"
+case "$out" in *'"hookSpecificOutput"'*'"additionalContext"'*) ok "shape present";; *) no "shape present";; esac
+if command -v jq >/dev/null 2>&1; then
+	if printf '%s' "$out" | jq -e '.hookSpecificOutput.additionalContext | length > 0' >/dev/null 2>&1; then ok "valid JSON with content"; else no "valid JSON with content"; fi
+else
+	ok "skipped — jq not available"
+fi
+
+start "the phase gate denies, allows, overrides, and fails open"
+printf '# P\n\n**Phase:** Ideation — gate test\n' >"$p/.waypoint/project.md"
+out="$(printf '{"tool_input":{"file_path":"%s/src/main.go"}}' "$p" | CLAUDE_PROJECT_DIR="$p" sh "$p/.claude/hooks/waypoint-phase-gate.sh")"
+case "$out" in *'"permissionDecision":"deny"'*) ok "denies a production write in Ideation";; *) no "denies a production write in Ideation";; esac
+out="$(printf '{"tool_input":{"file_path":"%s/.waypoint/design/d.md"}}' "$p" | CLAUDE_PROJECT_DIR="$p" sh "$p/.claude/hooks/waypoint-phase-gate.sh")"
+if [ -z "$out" ]; then ok ".waypoint/ writes always pass"; else no ".waypoint/ writes always pass"; fi
+out="$(printf '{"tool_input":{"file_path":"%s/src/main.go"}}' "$p" | WAYPOINT_PHASE_GATE=off CLAUDE_PROJECT_DIR="$p" sh "$p/.claude/hooks/waypoint-phase-gate.sh")"
+if [ -z "$out" ]; then ok "the override lifts the gate"; else no "the override lifts the gate"; fi
+printf '# P\n\n**Phase:** Execution — building\n' >"$p/.waypoint/project.md"
+out="$(printf '{"tool_input":{"file_path":"%s/src/main.go"}}' "$p" | CLAUDE_PROJECT_DIR="$p" sh "$p/.claude/hooks/waypoint-phase-gate.sh")"
+if [ -z "$out" ]; then ok "Execution passes"; else no "Execution passes"; fi
+printf 'no phase line here\n' >"$p/.waypoint/project.md"
+out="$(printf '{"tool_input":{"file_path":"%s/src/main.go"}}' "$p" | CLAUDE_PROJECT_DIR="$p" sh "$p/.claude/hooks/waypoint-phase-gate.sh" 2>/dev/null)"
+if [ -z "$out" ]; then ok "an unreadable phase fails open"; else no "an unreadable phase fails open"; fi
+
+start "the shell gate closes the write path the edit gate cannot see"
+printf '# P\n\n**Phase:** Ideation — gate test\n' >"$p/.waypoint/project.md"
+out="$(printf '{"tool_input":{"command":"echo hi > src/out.txt"}}' | CLAUDE_PROJECT_DIR="$p" sh "$p/.claude/hooks/waypoint-shell-gate.sh")"
+case "$out" in *'"permissionDecision":"deny"'*) ok "denies a shell write in Ideation";; *) no "denies a shell write in Ideation";; esac
+out="$(printf '{"tool_input":{"command":"mkdir -p .waypoint/design"}}' | CLAUDE_PROJECT_DIR="$p" sh "$p/.claude/hooks/waypoint-shell-gate.sh")"
+if [ -z "$out" ]; then ok "writes into .waypoint/ pass"; else no "writes into .waypoint/ pass"; fi
+out="$(printf '{"tool_input":{"command":"git log --oneline"}}' | CLAUDE_PROJECT_DIR="$p" sh "$p/.claude/hooks/waypoint-shell-gate.sh")"
+if [ -z "$out" ]; then ok "read commands pass"; else no "read commands pass"; fi
+printf '# P\n\n**Phase:** Execution — building\n' >"$p/.waypoint/project.md"
+out="$(printf '{"tool_input":{"command":"rm -rf build"}}' | CLAUDE_PROJECT_DIR="$p" sh "$p/.claude/hooks/waypoint-shell-gate.sh")"
+if [ -z "$out" ]; then ok "Execution passes"; else no "Execution passes"; fi
+
+start "the memory backstop blocks once, then lets go"
+p="$(project backstop)"
+run install-claude "$p"
+git -C "$p" init -q
+echo hi >"$p/app.txt"
+out="$(printf '{"stop_hook_active":false}' | CLAUDE_PROJECT_DIR="$p" sh "$p/.claude/hooks/waypoint-memory-backstop.sh")"
+case "$out" in *'"decision":"block"'*) ok "blocks when the tree changed and memory is silent";; *) no "blocks when the tree changed and memory is silent";; esac
+out="$(printf '{"stop_hook_active":true}' | CLAUDE_PROJECT_DIR="$p" sh "$p/.claude/hooks/waypoint-memory-backstop.sh")"
+if [ -z "$out" ]; then ok "never blocks twice"; else no "never blocks twice"; fi
+touch "$p/.waypoint/memory/$(date +%Y-%m-%d)-entry.md"
+out="$(printf '{"stop_hook_active":false}' | CLAUDE_PROJECT_DIR="$p" sh "$p/.claude/hooks/waypoint-memory-backstop.sh")"
+if [ -z "$out" ]; then ok "a dated memory entry satisfies it"; else no "a dated memory entry satisfies it"; fi
+
+start "the question gate answers in prose and ships unwired"
+out="$(sh "$ROOT/adapters/claude/hooks/waypoint-question-gate.sh" </dev/null)"
+case "$out" in *prose*) ok "denies with the prose instruction";; *) no "denies with the prose instruction";; esac
+
+start "cursor hooks are installed and behave"
+p="$(project cursorhooks)"
+run install-cursor "$p"
+exists "$p/.cursor/hooks.json" "hooks.json created"
+for h in session-start shell-gate edit-watch stop; do
+	if [ -x "$p/.cursor/hooks/waypoint-$h.sh" ]; then ok "waypoint-$h.sh installed executable"; else no "waypoint-$h.sh installed executable"; fi
+done
+out="$(cd "$p" && sh .cursor/hooks/waypoint-session-start.sh)"
+case "$out" in *'"additional_context"'*'Standing rules'*) ok "session start injects the standing rules";; *) no "session start injects the standing rules";; esac
+printf '# P\n\n**Phase:** Ideation — gate test\n' >"$p/.waypoint/project.md"
+out="$(printf '{"command":"rm -rf build","cwd":"/x"}' | (cd "$p" && sh .cursor/hooks/waypoint-shell-gate.sh))"
+case "$out" in *'"permission":"deny"'*) ok "shell gate denies a write in Ideation";; *) no "shell gate denies a write in Ideation";; esac
+out="$(printf '{"command":"mkdir -p .waypoint/design","cwd":"/x"}' | (cd "$p" && sh .cursor/hooks/waypoint-shell-gate.sh))"
+case "$out" in *'"permission":"allow"'*) ok "writes into .waypoint/ pass";; *) no "writes into .waypoint/ pass";; esac
+out="$(printf '{"command":"git log --oneline","cwd":"/x"}' | (cd "$p" && sh .cursor/hooks/waypoint-shell-gate.sh))"
+case "$out" in *'"permission":"allow"'*) ok "read commands pass";; *) no "read commands pass";; esac
+printf '{"file_path":"src/a.ts","edits":[]}' | (cd "$p" && sh .cursor/hooks/waypoint-edit-watch.sh)
+holds "$p/.cursor/waypoint-out-of-phase-edits" "src/a.ts" "edit watch records an out-of-phase edit"
+out="$(printf '{"status":"completed","loop_count":0}' | (cd "$p" && sh .cursor/hooks/waypoint-stop.sh))"
+case "$out" in *followup_message*src/a.ts*) ok "stop sends the agent back to correct it";; *) no "stop sends the agent back to correct it";; esac
+out="$(printf '{"status":"completed","loop_count":1}' | (cd "$p" && sh .cursor/hooks/waypoint-stop.sh))"
+if [ "$out" = "{}" ]; then ok "loop guard holds"; else no "loop guard holds"; fi
+
 # ─── Dogfooding invariant ────────────────────────────────────────────────────
 
 # Waypoint tracks its own development, so its .waypoint/ is a live install of the
@@ -343,6 +511,30 @@ exists "$p/.waypoint/skills/debug.md" "reinstalls into a spaced path"
 start "the dogfooded .waypoint/ matches the shipped templates"
 same "$ROOT/templates/opord.md" "$ROOT/.waypoint/opord.md" "OPORD matches its template"
 same "$ROOT/templates/memory.md" "$ROOT/.waypoint/memory/README.md" "memory README matches its template"
+
+start "the shipped OPORD carries a standing-rules region"
+r="$(region_of "$ROOT/templates/opord.md")"
+if [ -n "$r" ]; then ok "region present in templates/opord.md"; else no "region present in templates/opord.md"; fi
+
+# ─── Register boundary ───────────────────────────────────────────────────────
+
+# The OPORD and CONOPS keep their format terms; nothing else the framework
+# ships uses them. This is what keeps the register from creeping back.
+start "the OPORD's format terms stay inside the OPORD"
+no_leak "SUSTAINMENT"
+no_leak "COMMAND & SIGNAL"
+no_leak "Issuing HQ"
+no_leak "SITUATION"
+no_leak "logistics line"
+no_leak "rules of engagement"
+
+# ─── Phase grammar ───────────────────────────────────────────────────────────
+
+start "the dogfooded project.md parses for the phase gate"
+n="$(grep -c '^\*\*Phase:\*\*' "$ROOT/.waypoint/project.md")"
+if [ "$n" = "1" ]; then ok "exactly one Phase line"; else no "exactly one Phase line — found $n"; fi
+ph="$(grep -m1 '^\*\*Phase:\*\*' "$ROOT/.waypoint/project.md" | grep -oE 'Ideation|Planning|Execution' | head -1)"
+if [ -n "$ph" ]; then ok "phase name readable ($ph)"; else no "phase name readable"; fi
 
 # ─── Result ──────────────────────────────────────────────────────────────────
 

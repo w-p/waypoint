@@ -29,7 +29,7 @@ For a shorter re-orientation after a normal session gap, use the `resume` skill 
 
 Read the following in order:
 
-1. `.waypoint/opord.md` — standing orders and rules of engagement
+1. `.waypoint/opord.md` — standing orders and working rules
 2. `.waypoint/conops.md` — what the project is, who uses it, what it must and must not do
 3. `.waypoint/project.md` — current phase, what has shipped, what is deferred
 

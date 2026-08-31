@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      { "command": ".cursor/hooks/waypoint-session-start.sh" }
+    ],
+    "beforeShellExecution": [
+      { "command": ".cursor/hooks/waypoint-shell-gate.sh" }
+    ],
+    "afterFileEdit": [
+      { "command": ".cursor/hooks/waypoint-edit-watch.sh" }
+    ],
+    "stop": [
+      { "command": ".cursor/hooks/waypoint-stop.sh", "loop_limit": 2 }
+    ]
+  }
+}

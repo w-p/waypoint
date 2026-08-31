@@ -1,6 +1,6 @@
 # Project state
 
-**Phase:** Execution — the skill-driven update (design and plan dated 2026-08-14) is built and in the working tree on branch `v2`, alongside the committed boot/memory optimization. Both are in field testing before merge to main.
+**Phase:** Execution — the enforcement ladder (design and plan dated 2026-08-31) is built and in the working tree on branch `v2`, alongside the skill-driven update (2026-08-14) and the boot/memory optimization. All in field testing before merge to main.
 
 **Shipped:**
 
@@ -13,7 +13,8 @@
 - Test suite (`test.sh`) — covers `update`'s ownership guarantees, the CONOPS scaffold lifecycle, migration paths, the install guards, and the dogfooding invariant (templates ≡ dogfooded `.waypoint/`)
 - Boot/memory optimization (2026-08-07 design, revised in review) — the mandatory session boot reads the binding documents (`conops.md`, `project.md`, the OPORD) plus a folder listing as index and the most-recent memory file, with design/plan and older memory pulled on demand; the filename-as-index memory convention with a safe rename/upgrade procedure and a compaction policy; a single-sourcing OPORD duty; a defined audience for `CHANGELOG.md`; and a drift test guarding the template/dogfood pairs
 - Skill-driven update (2026-08-14 design) — the `update-waypoint` core skill: reads `.waypoint/VERSION` (`revision:` plus the new `origin:`), clones or reuses the source, reruns install, narrates the change log, and three-way merges an extended OPORD with the developer reviewing the diff. Install became the refresh mechanism; the standing-checkout requirement retired
-- README — what Waypoint is, how to install it, and how to keep it current
+- Enforcement ladder (2026-08-31 design) — every rule at the strongest layer its host can hold. A standing-rules region in the OPORD, composed into both adapter rule files by the installer with a drift test; Claude Code hooks (session-start and post-compaction injection, per-prompt reminder, phase gate on edits and shell writes, block-once memory backstop, opt-in question gate); Cursor hooks (session-start injection, shell gate, edit watcher plus stop follow-up, memory reminder); wiring created/merged/printed, never blind-edited; a §3f Voice section with the register boundary; the machine-read `**Phase:**` line; the README "What's enforced" matrix. `WAYPOINT_PHASE_GATE=off` lifts the gates for a session
+- README — what Waypoint is, how to install it, what's enforced, and how to keep it current
 - `CHANGELOG.md` — dated entries, backfilled to the first commit
 
 **Approach**
@@ -44,6 +45,7 @@
 
 **Plan**
 
+- `.waypoint/plan/2026-08-31-enforcement-ladder.md` — standing-rules extraction, adapter hooks for injection and gates on both vendors, the register boundary, the README capability contract. Executed; in the working tree on `v2`.
 - `.waypoint/plan/2026-08-14-skill-driven-update.md` — update becomes a core skill, install becomes the refresh mechanism, VERSION gains `origin:`. Executed; in the working tree on `v2`.
 - `.waypoint/plan/2026-08-07-cost-curve-and-document-model.md` — the boot/memory optimization, taken through the full Ideation → Planning → Execution workflow. Executed; on branch `v2`.
 - The v1 framework itself was built directly from the CONOPS without a written Planning phase — a deviation recorded rather than papered over. Small fixes since have not warranted one.

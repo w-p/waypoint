@@ -1,9 +1,10 @@
 # Waypoint
 
 A `.waypoint/` directory of plain Markdown that gives your AI coding assistant persistent
-project knowledge and a phase-gated workflow. No runtime, no dependencies, no service.
-The assistant reads it at the start of every session, so you stop re-explaining your
-project.
+project knowledge and a phase-gated workflow. The core is plain Markdown — no runtime, no
+service. Thin adapters wire it into your editor's rules and hooks, so the standing rules
+are delivered every session and the phase gate is enforced rather than hoped for. The
+assistant reads it at the start of every session, so you stop re-explaining your project.
 
 ## Install
 
@@ -24,9 +25,12 @@ Installs into the current directory unless you pass a path: `waypoint install-cl
 /path/to/project`. There is no bare `install` — the script can't tell which editor you
 use and won't guess.
 
-You get `.waypoint/` plus one rule file for your editor (`.claude/rules/waypoint.md` or
-`.cursor/rules/session-briefing.mdc`). Nothing else is touched — your existing
-`CLAUDE.md` and rules are left alone. Commit all of it.
+You get `.waypoint/`, one rule file for your editor (`.claude/rules/waypoint.md` or
+`.cursor/rules/session-briefing.mdc`), and the editor's hooks: small shell scripts in
+`.claude/hooks/` or `.cursor/hooks/`, wired through `.claude/settings.json` or
+`.cursor/hooks.json`. The wiring file is created if you don't have one, merged (via
+`jq`) if you do, and printed for you to paste when it can't be merged safely. Your
+existing `CLAUDE.md`, rules, and settings are never blind-edited. Commit all of it.
 
 ## Then write your CONOPS
 
@@ -70,6 +74,41 @@ Write design/*            Write plan/*              Update project.md + memory/
 
 The point is that no code gets written before you've approved a design and a plan. The
 current phase lives in `project.md`.
+
+## What's enforced
+
+Every Waypoint rule lives at the strongest level its host editor can hold:
+
+- **Enforced** — a hook blocks the action and tells the assistant why.
+- **Delivered** — a hook or an always-applied rule keeps the instruction in context;
+  the judgment is still the model's.
+- **Advisory** — prose in the OPORD.
+
+| | Claude Code | Cursor |
+|---|---|---|
+| Standing rules present every session | Delivered (rule file + session-start hook) | Delivered (always-applied rule, re-sent per request) |
+| Automatic re-brief after a context compaction | Delivered (compact hook) | Partial — the rules survive; state recovery is advisory |
+| Standing rules at the fresh end of context, every prompt | Delivered (prompt hook) | Delivered (always-applied rule) |
+| Phase gate on file edits | Enforced (denied before the edit lands) | Detect-and-correct (flagged after; the agent is sent back before stopping) |
+| Phase gate on file-writing shell commands | Enforced | Enforced |
+| Memory recorded before the session ends | Enforced, reminds once | Enforced, reminds once |
+| No interactive question prompts | Opt-in hook | not applicable |
+| Voice, design taste, judgment | Advisory | Advisory |
+
+The phase gates never block writes inside `.waypoint/` — designs, plans, and memory are
+exactly what the gated phases produce. To lift a gate for one session, set
+`WAYPOINT_PHASE_GATE=off`. To turn on the question gate (for projects that don't want
+option-picker prompts), add this entry to the `PreToolUse` list in
+`.claude/settings.json`:
+
+```json
+{ "matcher": "AskUserQuestion",
+  "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/waypoint-question-gate.sh" }] }
+```
+
+Everything else — when to ask, how designs are judged, how prose reads — is advisory on
+purpose. It's judgment, and the delivered standing rules keep the criteria for that
+judgment in front of the model.
 
 ## Skills
 

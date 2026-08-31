@@ -2,7 +2,9 @@
 
 <!-- This file is the current-state snapshot of the project. The AI maintains it.
      Update the phase, shipped list, and deferred list as work progresses.
-     Keep ground truth docs current so any session can orient quickly. -->
+     Keep ground truth docs current so any session can orient quickly.
+     The Phase line is machine-read by the adapters' hooks: keep exactly one line
+     starting **Phase:** naming Ideation, Planning, or Execution. -->
 
 **Phase:** [Ideation | Planning | Execution] — [brief description of where things stand]
 

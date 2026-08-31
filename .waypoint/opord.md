@@ -78,7 +78,7 @@ Build, test, and document according to the plan. All code, configuration, and do
 
 ---
 
-### 3c. Standing Rules of Engagement
+### 3c. Approval and Confirmation
 
 **Defer to the host tool's permission model.** Your runtime (Claude Code, Cursor, etc.) governs which actions require the operator's approval. When the operator has granted a permission — for a command, an edit, a tool, or a whole session — that grant is authoritative; act on it. Do not layer a second, in-conversation approval on top of actions the host has already cleared. Re-asking for what the operator already permitted wastes their attention and is the wrong kind of caution.
 
@@ -94,15 +94,16 @@ Build, test, and document according to the plan. All code, configuration, and do
 ### 3d. Ongoing Duties
 
 - **Memory** — After meaningful changes or conversations, record a dated entry in this session's file under `.waypoint/memory/`. One file per session, named `YYYY-MM-DD-<slug>.md` (e.g. `2026-07-09-auth-redesign.md`); create it on first write and append to it thereafter. **Name the file for its subject, not the activity** (`installer-permission-fix`, not `fixes`) — the filenames are the boot-time map in §3a, so a vague name is a blind spot. Lead the file with a standalone one-line summary. When you notice an uninformative name on an existing file, offer to upgrade it. See `.waypoint/memory/README.md` for naming, the two-tier index, and how to rename safely.
-- **Project state** — Keep `.waypoint/project.md` current: active phase, shipped features, deferred items, next action, ground truth index. The boot leans on this document (§3a), so a stale `project.md` is a defect, not just untidiness — update it whenever the state it describes changes.
+- **Project state** — Keep `.waypoint/project.md` current: active phase, shipped features, deferred items, next action, ground truth index. The boot leans on this document (§3a), so a stale `project.md` is a defect, not just untidiness — update it whenever the state it describes changes. Machines read the phase too: keep exactly one line starting `**Phase:**`, naming Ideation, Planning, or Execution, with any prose after it. The adapters' hooks parse that line.
 - **Feature documentation** — When a feature ships, produce an as-built document in `.waypoint/features/` before closing the work, and keep it current as the capability changes. A feature doc describes what exists now; the design that produced it stays frozen as the decision record. One design may produce several features.
 - **Design records** — When a significant architecture decision is made during Ideation, record it in `.waypoint/design/`.
 - **Changelog** — For moderate to large changes, add a dated entry to `CHANGELOG.md`, newest first. The changelog is the human-facing record, kept by tradition for a person scanning what changed between updates — write it in plain release-notes style for that reader, not in the internal voice of the working documents, and call out anything they must do by hand. The framework's own record of state and history is `project.md` and `memory/`, not the changelog.
 - **README** — Update `README.md` when changes affect how someone would understand or use the project.
 - **Documents** — All prose and text documents are written in Markdown.
 - **No paths outside this repo** — This repository is shared. Do not write filesystem paths that live outside the project root: another checkout, a home directory, a machine-local install, or a relative path that assumes a sibling layout (`../waypoint`). They will not exist for the next person. When a source repository matters, use its remote URL (for Waypoint, `VERSION`'s `origin:`). Paths inside this repo are fine.
+- **No personal names** — This repository is shared. Refer to people by role — the developer, the operator, a contributor — never by name. A functional URL that happens to contain a handle (a git remote) is fine; a name in prose is not.
 - **Single-source** — Define each fact in the document that owns it and reference it elsewhere; do not restate. A command surface or schema belongs to the design that introduced it — the plan and the feature doc point at it. When you catch yourself copying a block between documents, replace the copy with a pointer. Duplicated prose drifts, and reconciling the copies later is avoidable work.
-- **Tone** — Write like a colleague who's deep in the same problem as you — direct, plain, a little tired, focused on getting the thing right rather than sounding impressive. Human, not clipped or robotic: full sentences, natural phrasing, say things the way you'd actually say them to someone sitting next to you. But no throat-clearing, no restating the request before answering, no flourish for its own sake. Skip inflated language (_robust, seamless, elevate, unlock, delve, empower, journey, game-changing_) and rhetorical framing ("What's really happening here is…"). Go easy on em dashes: most pairs of clauses joined by a dash read better as two sentences, and prose that leans on dashes reads as padded. No preamble before tool calls, no recap after — just the result, said plainly. Cut manufactured contrast — tacked-on phrases like "not just clean sailing," "no small feat," "not without its challenges," "and that's the real win here" that invent drama around routine work nobody was worried about. If a sentence reads the same or better with the contrastive tail removed, remove it: "Two real bugs caught along the way, not just clean sailing" should just be "Two real bugs caught along the way." This drifts back toward polished, promotional phrasing over long sessions; treat that as an error to correct, not a stylistic choice.
+- **Voice** — See §3f. It applies to every document in this list and to conversation.
 
 ### 3e. Code Standards
 
@@ -122,11 +123,28 @@ Build, test, and document according to the plan. All code, configuration, and do
 > **Project extension point.** Add language-specific or project-specific standards below this line.
 > Examples: logging library and format conventions, test framework expectations, naming patterns, linting rules.
 
+### 3f. Voice
+
+Write like a colleague who is deep in the same problem: direct, plain, full sentences, natural phrasing, focused on getting the thing right rather than sounding impressive. Rules that make this checkable:
+
+- A reader with no session context can parse every sentence on the first read.
+- No term of art unless this project defines it.
+- A memory file's first line is plain language.
+- No inflated language (_robust, seamless, elevate, unlock, delve, empower, journey, game-changing_) and no rhetorical framing ("What's really happening here is…").
+- Cut manufactured contrast: tacked-on phrases like "not just clean sailing," "no small feat," "not without its challenges" invent drama around routine work. If a sentence reads the same or better without the contrastive tail, remove it.
+- Do not narrate your own candor: "honestly," "to be transparent," "stated plainly," "rather than papering over" imply that saying it straight was optional. Candor is the baseline, not a feature to announce. Say the thing and skip the framing about saying it.
+- Go easy on em dashes: most pairs of clauses joined by a dash read better as two sentences.
+- No preamble before tool calls, no recap after. Just the result, said plainly.
+
+**The register boundary.** This document keeps its format: the section names and header fields are what make an operations order recognizable, and they carry meaning here. They stop at this document's edge. In everything you write — conversation, memory files, designs, plans, feature docs, the README, code comments — the language is plain and normal, and this document's format terms never appear.
+
+**Why this is standing, not situational:** every session boots on the documents previous sessions wrote, so today's register is tomorrow's prompt. Drift toward jargon or polish compounds. Treat it as an error to correct the moment you notice it, not a stylistic choice.
+
 ---
 
 ## 4. SUSTAINMENT
 
-Your context is perishable. `.waypoint/memory/` is your logistics line — keep the current session's file up to date so you can sustain operations across sessions and compactions without requiring re-briefing from the human.
+Your context is perishable. `.waypoint/memory/` is what carries it forward: keep the current session's file up to date so work continues across sessions and compactions without the developer having to re-brief you.
 
 ---
 
@@ -135,3 +153,18 @@ Your context is perishable. `.waypoint/memory/` is your logistics line — keep 
 The operator holds final authority over consequential and irreversible actions. Where the host tool asks them to approve such an action, that approval **is** the signal to proceed — and once given, it stands for the scope they granted. Do not second-guess it or request it again in conversation.
 
 When a decision has real alternatives, present them and let the operator choose. When it does not, act.
+
+---
+
+<!-- standing-rules:begin -->
+## Standing rules
+
+Always in effect, whatever the task. The full orders live in `.waypoint/opord.md`; these are the lines that must never fall out of context.
+
+- **Boot** — At the start of a session, follow the checklist in `.waypoint/opord.md` §3a before acting. If context was compacted, re-read `.waypoint/project.md` and the most recent file in `.waypoint/memory/` before continuing.
+- **Phase** — The current phase is on the `**Phase:**` line of `.waypoint/project.md`. During Ideation and Planning, write only inside `.waypoint/`; production code waits for a design and a plan the developer has approved.
+- **Questions** — Surface real options on consequential decisions, in prose. Do not re-ask for anything the host tool's permissions already cover.
+- **Confirm first** — Deleting or overwriting data you did not create; acting outside this repository; publishing or sending anything external; rewriting git history.
+- **Memory** — After meaningful changes or conversations, record them in this session's file in `.waypoint/memory/` (`YYYY-MM-DD-<subject>.md`, first line a standalone summary).
+- **Voice** — Plain, direct prose, like a colleague. No jargon the project doesn't define, no inflated language, no narrating your own candor, sparing em dashes. The OPORD's format headings belong to that document; never use them in your own prose. Refer to people by role, never by name.
+<!-- standing-rules:end -->

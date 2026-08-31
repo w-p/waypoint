@@ -64,7 +64,7 @@ The secondary user is a **new contributor** — human or AI — onboarding to an
 
 ## 4. System Overview
 
-Waypoint lives in a `.waypoint/` directory at the root of the project repository. All framework files are plain Markdown. No runtime, no tooling installation, and no external service is required.
+Waypoint lives in a `.waypoint/` directory at the root of the project repository. All framework files are plain Markdown. The core requires no runtime, no tooling installation, and no external service. Vendor adapters may additionally install host-native hooks — small scripts the editor itself runs — to deliver the standing rules and enforce the phase gate; the core never depends on them.
 
 **Directory structure:**
 
@@ -80,7 +80,7 @@ Waypoint lives in a `.waypoint/` directory at the root of the project repository
   skills/           Entry point guides and reusable domain procedures
 ```
 
-**Vendor adapters** are thin integration files that wire the framework's session-start briefing into a specific tool's native mechanism — Cursor rules, Claude Code rules, an `AGENTS.md`, and so on. They ship in the Waypoint repository under `adapters/` and install into the host tool's own rules location: `.claude/rules/waypoint.md` for Claude Code, `.cursor/rules/session-briefing.mdc` for Cursor. Nothing vendor-specific is written inside `.waypoint/` — everything there is identical regardless of which tool is in use, and the adapter never edits a project's existing instruction files.
+**Vendor adapters** wire the framework into a specific tool's native mechanisms. Each adapter installs a rule file into the host tool's own rules location (`.claude/rules/waypoint.md` for Claude Code, `.cursor/rules/session-briefing.mdc` for Cursor) and, where the tool has them, hooks: session-start delivery of the standing rules, the phase gate, and the memory reminder. Adapters hold no policy of their own — policy lives in `.waypoint/`, identical regardless of which tool is in use, and the adapter compiles it into whatever the host offers. The installer never blind-edits a project's existing instruction or settings files: wiring is created when absent, merged when that can be done safely, and printed for the developer to apply otherwise.
 
 **The framework ships** a set of templates and core skill documents that a developer copies into their project's `.waypoint/` when adopting Waypoint. Projects then customise the OPORD and CONOPS for their context; the templates themselves are not modified.
 
@@ -131,7 +131,7 @@ The AI assistant has standing duties that apply continuously across all phases �
 
 ### 5e. Session start
 
-On every new session start, the AI reads `opord.md` first. Its Pre-Action Checklist (§3a) governs the rest of the boot: the binding documents and a map of the narrative folders are read every session, and everything else is pulled on demand. This is enforced through the vendor adapter for the tool in use. The adapter's sole job is to ensure this happens automatically.
+On every new session start, the AI reads `opord.md` first. Its Pre-Action Checklist (§3a) governs the rest of the boot: the binding documents and a map of the narrative folders are read every session, and everything else is pulled on demand. The vendor adapter ensures this happens automatically — through its rule file, and through hooks where the tool has them, which also deliver the OPORD's standing rules at session start, after context compactions, and on every prompt.
 
 ---
 
@@ -152,7 +152,7 @@ On every new session start, the AI reads `opord.md` first. Its Pre-Action Checkl
 - CI/CD pipeline configuration
 - Runtime monitoring, alerting, or observability
 - Multi-tenancy, team-level access control, or hosted deployment of any kind
-- Anything that lives outside the `.waypoint/` directory
+- Anything outside `.waypoint/`, other than the vendor adapters' own install locations (the host tool's rules and hooks directories and their wiring files)
 - Compatibility with weaker or non-capable AI models (behavior on sub-frontier models is undefined and untested)
 
 ---
