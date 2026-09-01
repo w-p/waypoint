@@ -23,12 +23,13 @@ if [ -z "$cmd" ]; then
 	cmd="$(printf '%s' "$input" | sed -n 's/.*"command"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
 fi
 
-# Writes aimed at .waypoint/ are the legitimate output of gated phases.
-case "$cmd" in
-	*.waypoint/*) printf '{"permission":"allow"}'; exit 0 ;;
-esac
-
-if printf '%s' "$cmd" | grep -qE '(^|[;&|[:space:]])(rm|mv|cp|tee|touch|mkdir)([[:space:]]|$)|>|sed[[:space:]].*-i'; then
+# Writes aimed at .waypoint/ are the legitimate output of gated phases. The
+# command is judged segment by segment (split on ;, |, &) so that mentioning
+# .waypoint/ in one segment does not wave through a write elsewhere on the
+# same line. This deters a cooperating agent; it is not a security boundary.
+if printf '%s' "$cmd" | tr ';|&' '\n' \
+	| grep -E '(^|[[:space:]])(rm|mv|cp|tee|touch|mkdir)([[:space:]]|$)|>|sed[[:space:]].*-i' \
+	| grep -qv '\.waypoint/'; then
 	printf '{"permission":"deny","user_message":"Waypoint phase gate: the project is in %s, so file-writing shell commands are blocked outside .waypoint/.","agent_message":"Waypoint phase gate: the project is in %s (.waypoint/project.md), so production files are not written yet. Designs, plans, and memory in .waypoint/ are always writable. Ways forward: finish the phase and have the developer approve moving it, or the developer sets WAYPOINT_PHASE_GATE=off for this session."}' "$phase" "$phase"
 	exit 0
 fi
