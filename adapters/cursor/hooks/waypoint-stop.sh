@@ -26,8 +26,14 @@ git rev-parse --git-dir >/dev/null 2>&1 || { printf '{}'; exit 0; }
 
 changed="$(git status --porcelain -uall 2>/dev/null | grep -v '\.waypoint/' || true)"
 if [ -n "$changed" ]; then
+	# A session that commits its memory entry mid-session must not be nagged,
+	# so the check is file existence, not git status — status only shows
+	# uncommitted files.
 	today="$(date +%Y-%m-%d)"
-	recorded="$(git status --porcelain -uall -- "$wp/memory/" 2>/dev/null | grep -F "$today" || true)"
+	recorded=""
+	for f in "$wp/memory/$today"-*.md; do
+		[ -e "$f" ] && recorded=1
+	done
 	if [ -z "$recorded" ]; then
 		printf '{"followup_message":"Waypoint: the working tree changed this session but no memory file dated %s was written. Record the session in .waypoint/memory/ (%s-<subject>.md, first line a standalone summary), then finish."}' "$today" "$today"
 		exit 0

@@ -36,6 +36,14 @@ affects those, merging is manual.
 - **By hand, if your OPORD is extended:** the region, §3f, the §3c title, and the
   phase-line spec are baseline changes — run the update-waypoint skill to merge them.
   An unextended OPORD fast-forwards automatically on install.
+- **Two hook corrections, found in a field review.** The memory backstop now checks
+  whether a memory file dated today exists rather than asking `git status` — a session
+  that committed its entry mid-session was nagged anyway, since status only shows
+  uncommitted files. And the shell gate now judges a command segment by segment (split
+  on `;`, `|`, `&`) instead of allowing any command that mentions `.waypoint/`
+  anywhere, so `rm -rf src && echo done >> .waypoint/notes.md` no longer slips through
+  an Ideation gate. Both fixes apply to both adapters; the gate remains a deterrent for
+  a cooperating agent, not a security boundary, and its comments now say so.
 
 ## 2026-08-14
 

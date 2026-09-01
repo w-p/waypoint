@@ -25,12 +25,13 @@ else
 fi
 [ -n "$cmd" ] || exit 0
 
-# Writes aimed at .waypoint/ are the legitimate output of gated phases.
-case "$cmd" in
-	*.waypoint/*) exit 0 ;;
-esac
-
-if printf '%s' "$cmd" | grep -qE '(^|[;&|[:space:]])(rm|mv|cp|tee|touch|mkdir)([[:space:]]|$)|>|sed[[:space:]].*-i'; then
+# Writes aimed at .waypoint/ are the legitimate output of gated phases. The
+# command is judged segment by segment (split on ;, |, &) so that mentioning
+# .waypoint/ in one segment does not wave through a write elsewhere on the
+# same line. This deters a cooperating agent; it is not a security boundary.
+if printf '%s' "$cmd" | tr ';|&' '\n' \
+	| grep -E '(^|[[:space:]])(rm|mv|cp|tee|touch|mkdir)([[:space:]]|$)|>|sed[[:space:]].*-i' \
+	| grep -qv '\.waypoint/'; then
 	printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Waypoint phase gate: the project is in %s (.waypoint/project.md), so file-writing shell commands are blocked outside .waypoint/. Designs, plans, and memory in .waypoint/ are always writable. Ways forward: finish the phase and have the developer approve moving it, or the developer sets WAYPOINT_PHASE_GATE=off for this session."}}' "$phase"
 	exit 0
 fi

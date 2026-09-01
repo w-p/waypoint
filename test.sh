@@ -459,6 +459,10 @@ out="$(printf '{"tool_input":{"command":"mkdir -p .waypoint/design"}}' | CLAUDE_
 if [ -z "$out" ]; then ok "writes into .waypoint/ pass"; else no "writes into .waypoint/ pass"; fi
 out="$(printf '{"tool_input":{"command":"git log --oneline"}}' | CLAUDE_PROJECT_DIR="$p" sh "$p/.claude/hooks/waypoint-shell-gate.sh")"
 if [ -z "$out" ]; then ok "read commands pass"; else no "read commands pass"; fi
+out="$(printf '{"tool_input":{"command":"rm -rf src && echo done >> .waypoint/notes.md"}}' | CLAUDE_PROJECT_DIR="$p" sh "$p/.claude/hooks/waypoint-shell-gate.sh")"
+case "$out" in *'"permissionDecision":"deny"'*) ok "mentioning .waypoint/ does not wave through a write elsewhere";; *) no "mentioning .waypoint/ does not wave through a write elsewhere";; esac
+out="$(printf '{"tool_input":{"command":"mkdir -p .waypoint/notes && echo hi >> .waypoint/notes/n.md"}}' | CLAUDE_PROJECT_DIR="$p" sh "$p/.claude/hooks/waypoint-shell-gate.sh")"
+if [ -z "$out" ]; then ok "a compound write wholly inside .waypoint/ passes"; else no "a compound write wholly inside .waypoint/ passes"; fi
 printf '# P\n\n**Phase:** Execution — building\n' >"$p/.waypoint/project.md"
 out="$(printf '{"tool_input":{"command":"rm -rf build"}}' | CLAUDE_PROJECT_DIR="$p" sh "$p/.claude/hooks/waypoint-shell-gate.sh")"
 if [ -z "$out" ]; then ok "Execution passes"; else no "Execution passes"; fi
@@ -475,6 +479,17 @@ if [ -z "$out" ]; then ok "never blocks twice"; else no "never blocks twice"; fi
 touch "$p/.waypoint/memory/$(date +%Y-%m-%d)-entry.md"
 out="$(printf '{"stop_hook_active":false}' | CLAUDE_PROJECT_DIR="$p" sh "$p/.claude/hooks/waypoint-memory-backstop.sh")"
 if [ -z "$out" ]; then ok "a dated memory entry satisfies it"; else no "a dated memory entry satisfies it"; fi
+
+start "the memory backstop sees a committed entry"
+p="$(project backstopcommit)"
+run install-claude "$p"
+git -C "$p" init -q
+echo entry >"$p/.waypoint/memory/$(date +%Y-%m-%d)-work.md"
+git -C "$p" add -A
+git -C "$p" -c user.name=test -c user.email=test@test.invalid commit -qm "seed"
+echo hi >"$p/app.txt"
+out="$(printf '{"stop_hook_active":false}' | CLAUDE_PROJECT_DIR="$p" sh "$p/.claude/hooks/waypoint-memory-backstop.sh")"
+if [ -z "$out" ]; then ok "a committed entry dated today satisfies it"; else no "a committed entry dated today satisfies it"; fi
 
 start "the question gate answers in prose and ships unwired"
 out="$(sh "$ROOT/adapters/claude/hooks/waypoint-question-gate.sh" </dev/null)"
@@ -496,12 +511,21 @@ out="$(printf '{"command":"mkdir -p .waypoint/design","cwd":"/x"}' | (cd "$p" &&
 case "$out" in *'"permission":"allow"'*) ok "writes into .waypoint/ pass";; *) no "writes into .waypoint/ pass";; esac
 out="$(printf '{"command":"git log --oneline","cwd":"/x"}' | (cd "$p" && sh .cursor/hooks/waypoint-shell-gate.sh))"
 case "$out" in *'"permission":"allow"'*) ok "read commands pass";; *) no "read commands pass";; esac
+out="$(printf '{"command":"rm -rf src && echo done >> .waypoint/notes.md","cwd":"/x"}' | (cd "$p" && sh .cursor/hooks/waypoint-shell-gate.sh))"
+case "$out" in *'"permission":"deny"'*) ok "mentioning .waypoint/ does not wave through a write elsewhere";; *) no "mentioning .waypoint/ does not wave through a write elsewhere";; esac
 printf '{"file_path":"src/a.ts","edits":[]}' | (cd "$p" && sh .cursor/hooks/waypoint-edit-watch.sh)
 holds "$p/.cursor/waypoint-out-of-phase-edits" "src/a.ts" "edit watch records an out-of-phase edit"
 out="$(printf '{"status":"completed","loop_count":0}' | (cd "$p" && sh .cursor/hooks/waypoint-stop.sh))"
 case "$out" in *followup_message*src/a.ts*) ok "stop sends the agent back to correct it";; *) no "stop sends the agent back to correct it";; esac
 out="$(printf '{"status":"completed","loop_count":1}' | (cd "$p" && sh .cursor/hooks/waypoint-stop.sh))"
 if [ "$out" = "{}" ]; then ok "loop guard holds"; else no "loop guard holds"; fi
+git -C "$p" init -q
+echo entry >"$p/.waypoint/memory/$(date +%Y-%m-%d)-work.md"
+git -C "$p" add -A
+git -C "$p" -c user.name=test -c user.email=test@test.invalid commit -qm "seed"
+echo hi >"$p/app.txt"
+out="$(printf '{"status":"completed","loop_count":0}' | (cd "$p" && sh .cursor/hooks/waypoint-stop.sh))"
+if [ "$out" = "{}" ]; then ok "a committed memory entry dated today satisfies the backstop"; else no "a committed memory entry dated today satisfies the backstop"; fi
 
 # ─── Dogfooding invariant ────────────────────────────────────────────────────
 
