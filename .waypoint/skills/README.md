@@ -1,10 +1,11 @@
 # Skills
 
-This directory is empty on purpose. This repository **is** Waypoint, so the six core
+This directory is empty on purpose. This repository **is** Waypoint, so the core
 skills it ships live at the source, in `skills/` at the repository root — read them
 there:
 
-`new-project`, `new-feature`, `new-skill`, `onboarding`, `resume`, `debug`
+`new-project`, `new-feature`, `new-skill`, `onboarding`, `resume`, `debug`,
+`update-waypoint`, `report`
 
 In a project that has Waypoint installed, those same files are copied into this
 directory and `update` refreshes them. Copying them here would mean maintaining two

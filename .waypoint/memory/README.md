@@ -30,6 +30,18 @@ A reader finds what matters cheaply, descending only as far as needed:
 So **lead every file with a one-line summary that stands on its own**, and give the file a
 name that tells the truth about its contents.
 
+## Promoted entries
+
+A memory file is an observation. When its lesson generalizes or recurs, the rule is written
+into `sop.md` and the memory is marked, on the line directly under its summary:
+
+```
+promoted: sop.md#<section>
+```
+
+The file itself is never deleted or rewritten — it is the evidence behind the rule and stays
+in the index. The `report` skill has the checklist for deciding what to promote.
+
 ## Entry format
 
 Within a file, each entry is a dated bullet, most recent last:

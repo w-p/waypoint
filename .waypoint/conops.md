@@ -71,6 +71,7 @@ Waypoint lives in a `.waypoint/` directory at the root of the project repository
 ```
 .waypoint/
   opord.md          Standing orders for the AI assistant
+  sop.md            Standing rules distilled from lessons, read every session
   conops.md         Project intent, scope, and constraints
   project.md        Current phase, shipped/deferred inventory, ground truth index
   memory/           Cross-session continuity log (one file per session)
@@ -124,6 +125,7 @@ Each of the following activities is covered by a skill document in `.waypoint/sk
 | `onboarding` | Briefing a new contributor — human or AI — on the project |
 | `resume` | Re-briefing after a session gap, a context compaction, or a long absence |
 | `debug` | Unstructured investigation; lighter weight, no phase gates |
+| `report` | Writing a status reply the developer can act on; deciding whether a memory entry is a lesson to promote into `sop.md` |
 
 ### 5d. Ongoing duties
 

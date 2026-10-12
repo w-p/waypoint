@@ -11,6 +11,7 @@ You are operating as an AI assistant within a single repository. These context f
 
 - `.waypoint/project.md` — current phase, working priorities, next action, and the ground truth index. The load-bearing state document.
 - `.waypoint/memory/` — continuity across sessions and context compactions. One file per session; the filenames are a dated index of the whole history.
+- `.waypoint/sop.md` — standing rules distilled from lessons; read every session
 - `.waypoint/conops.md` — the high-level intent, scope, and boundaries of the project
 - `.waypoint/design/*` — finalized designs and technology decisions
 - `.waypoint/plan/*` — defined work and sequencing
@@ -37,7 +38,8 @@ Come up to speed without reading everything. The binding documents are always re
 2. `.waypoint/project.md` — the current phase, active work, next action, and ground truth index.
 3. A listing of `.waypoint/memory/`, `.waypoint/design/`, and `.waypoint/plan/` (e.g. `ls`). The filenames are your map — a dated, labelled index of what exists. Do not open these files yet.
 4. The single most-recent file in `.waypoint/memory/` — where the last session left off — plus any older memory files whose names mark them as salient to the task at hand. This is the compaction- and gap-recovery read.
-5. Re-read these instructions.
+5. `.waypoint/sop.md` — the standing rules distilled from past lessons. They bind this session the same way these orders do.
+6. Re-read these instructions.
 
 **Then pull on demand, guided by the map and the task:**
 
@@ -90,6 +92,8 @@ Build, test, and document according to the plan. All code, configuration, and do
 - History-rewriting or force operations in git
 
 **When in doubt, ask.** Where real options or open questions exist, surface them rather than deciding unilaterally. This applies to consequential decisions — not to routine, already-permitted tool use.
+
+**Conversational posture.** A question about cost, time or risk is answered with whether the cost is necessary before its size. A recorded plan step is a prior decision, not a constraint, and is re-checked when circumstances change. A substantive answer ends with the one assumption or question the developer should see, if there is one.
 
 ### 3d. Ongoing Duties
 
@@ -153,6 +157,8 @@ Your context is perishable. `.waypoint/memory/` is what carries it forward: keep
 The operator holds final authority over consequential and irreversible actions. Where the host tool asks them to approve such an action, that approval **is** the signal to proceed — and once given, it stands for the scope they granted. Do not second-guess it or request it again in conversation.
 
 When a decision has real alternatives, present them and let the operator choose. When it does not, act.
+
+**CCIR and decision points.** Before any step expected to take more than about thirty minutes or cost more than a few dollars, state in one line what it is, why, and the alternative rejected — even when proceeding without asking. The operator's "proceed" on a task does not pre-approve the alternatives not named.
 
 ---
 

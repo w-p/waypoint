@@ -70,7 +70,7 @@ Present the plan to the developer. Revise until approved. Then ask: "Ready to pr
 Work through the plan task by task. For each task:
 
 1. Implement the change
-2. Verify it works as specified
+2. Verify it works as specified, and report it as `report` describes — verifying and saying it are two halves of one duty
 3. Note any discovered complexity or necessary deviations from the plan
 
 If a deviation is significant, stop and surface it to the developer before continuing. Do not silently extend the scope.

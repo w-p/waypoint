@@ -38,7 +38,7 @@ ADAPTERS="$ROOT/adapters"
 
 # Core skills shipped by the framework. Install refreshes exactly these;
 # user-authored skills in .waypoint/skills/ are never touched.
-CORE_SKILLS="new-project.md new-feature.md new-skill.md onboarding.md resume.md debug.md update-waypoint.md"
+CORE_SKILLS="new-project.md new-feature.md new-skill.md onboarding.md resume.md debug.md update-waypoint.md report.md"
 
 # ─── Core ────────────────────────────────────────────────────────────────────
 
@@ -55,7 +55,8 @@ install_core() {
 
 	echo ""
 	echo "→ Installing templates..."
-	install_opord "$dest"
+	install_owned "$dest" opord.md
+	install_owned "$dest" sop.md
 	if [ ! -f "$wp/project.md" ]; then
 		cp "$TMPL_SRC/project.md" "$wp/project.md"
 		echo "  + .waypoint/project.md"
@@ -90,33 +91,33 @@ install_core() {
 	echo ""
 }
 
-# The OPORD is project-owned once installed: the developer extends it, so a
-# blind overwrite could destroy their rules. But never touching it left
-# unextended copies stale forever. The middle path: when the project's copy is
-# byte-identical to the baseline it was installed from (per the VERSION stamp),
-# nothing was extended and the new baseline applies safely. Anything else is
-# left alone; the update-waypoint skill owns the merge.
-install_opord() {
-	local dest="$1" dst="$1/.waypoint/opord.md" from old
+# The OPORD and SOP are project-owned once installed: the developer extends
+# them, so a blind overwrite could destroy their rules. But never touching them
+# left unextended copies stale forever. The middle path: when the project's copy
+# is byte-identical to the baseline it was installed from (per the VERSION
+# stamp), nothing was extended and the new baseline applies safely. Anything
+# else is left alone; the update-waypoint skill owns the merge.
+install_owned() {
+	local dest="$1" name="$2" dst="$1/.waypoint/$2" from old
 	if [ ! -f "$dst" ]; then
-		cp "$TMPL_SRC/opord.md" "$dst"
-		echo "  + .waypoint/opord.md"
+		cp "$TMPL_SRC/$name" "$dst"
+		echo "  + .waypoint/$name"
 		return
 	fi
-	if diff -q "$dst" "$TMPL_SRC/opord.md" >/dev/null 2>&1; then
-		echo "  ✓ .waypoint/opord.md  (matches the shipped baseline)"
+	if diff -q "$dst" "$TMPL_SRC/$name" >/dev/null 2>&1; then
+		echo "  ✓ .waypoint/$name  (matches the shipped baseline)"
 		return
 	fi
 	from="$(installed_revision "$dest")"
 	if [ -n "$from" ] && git -C "$ROOT" cat-file -e "${from}^{commit}" 2>/dev/null; then
-		old="$(git -C "$ROOT" show "${from}:templates/opord.md" 2>/dev/null || true)"
+		old="$(git -C "$ROOT" show "${from}:templates/$name" 2>/dev/null || true)"
 		if [ -n "$old" ] && [ "$old" = "$(cat "$dst")" ]; then
-			cp "$TMPL_SRC/opord.md" "$dst"
-			echo "  ✓ .waypoint/opord.md  (unextended — fast-forwarded to the new baseline)"
+			cp "$TMPL_SRC/$name" "$dst"
+			echo "  ✓ .waypoint/$name  (unextended — fast-forwarded to the new baseline)"
 			return
 		fi
 	fi
-	echo "  ! .waypoint/opord.md differs from the shipped baseline — left alone."
+	echo "  ! .waypoint/$name differs from the shipped baseline — left alone."
 	echo "    To merge the new baseline, use the update-waypoint skill:"
 	echo "      Read .waypoint/skills/update-waypoint.md and follow it."
 }
@@ -503,7 +504,7 @@ usage() {
       cd your-project && $0 install-cursor
 
     Reinstalling refreshes the framework-owned files (core skills, adapter,
-    memory README) and never touches your OPORD extensions, project.md, or a
+    memory README) and never touches your OPORD or SOP extensions, project.md, or a
     written CONOPS. To update a project end to end, use the skill — tell
     your assistant:
       Read .waypoint/skills/update-waypoint.md and follow it.

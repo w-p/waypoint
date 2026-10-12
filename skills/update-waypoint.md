@@ -57,7 +57,7 @@ project root:
 - neither → `<source>/waypoint install-core <project>`
 
 This is the whole mechanical update: framework-owned files refresh, legacy layouts heal,
-an unextended OPORD fast-forwards, and VERSION re-stamps. Project-owned files are never
+an unextended OPORD or SOP fast-forwards, and VERSION re-stamps. Project-owned files are never
 touched. Do not hand-copy framework files.
 
 ### Step 4 — Report what changed
@@ -70,7 +70,7 @@ Summarize the range for the developer in plain language: what moved and whether 
 needs action from them. If the range is empty, say the project was already current and
 stop after confirming the stamp.
 
-### Step 5 — Merge the OPORD if the baseline moved
+### Step 5 — Merge the OPORD and SOP if the baseline moved
 
 If `templates/opord.md` changed in that range and the installer reported the project's
 OPORD was left alone (meaning it is extended), perform a three-way merge:
@@ -85,11 +85,14 @@ without their review, regardless of session permissions — you are editing your
 standing orders.** Where a baseline change conflicts with a project extension, show the
 conflict and let the developer decide.
 
+`.waypoint/sop.md` is owned the same way: if `templates/sop.md` moved and the project's
+copy was left alone, merge it by the same procedure, with the same review.
+
 ### Step 6 — Confirm and record
 
 Verify `.waypoint/VERSION` stamps the new revision and `origin:`. Remove a temporary
 clone if you made one. Record the update in this session's file under
-`.waypoint/memory/`: the revision range crossed and whether an OPORD merge happened.
+`.waypoint/memory/`: the revision range crossed and whether an OPORD or SOP merge happened.
 
 ## Notes
 

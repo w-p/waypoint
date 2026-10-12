@@ -59,7 +59,7 @@ State the root cause clearly: "The bug is X. It is caused by Y. Evidence: Z."
 
 ### Step 5 — Fix and verify
 
-Apply the minimal fix that addresses the root cause. Verify the original behavior is resolved and no new issues are introduced.
+Apply the minimal fix that addresses the root cause. Verify the original behavior is resolved and no new issues are introduced. Report it as `report` describes: verifying and saying it are two halves of one duty.
 
 ### Step 6 — Record findings
 

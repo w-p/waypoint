@@ -50,6 +50,7 @@ coming up to speed, then answers.
 
 ```
 opord.md      Standing orders — what the assistant reads, how it behaves, code standards
+sop.md        Standing rules distilled from lessons; memory promotes into it
 conops.md     What the project is, who uses it, what's in and out of scope
 project.md    Current phase, what shipped, what's deferred, where the docs are
 memory/       One file per session; how context survives compaction and gaps
@@ -61,6 +62,12 @@ skills/       Procedures the assistant follows for recurring activities
 
 `opord.md` is yours once installed — extend it at the marked extension point in §3e with
 your language conventions, test expectations, linting rules. `update` never overwrites it.
+
+`sop.md` is yours the same way. Memory is where incidents are recorded; `sop.md` is where
+the rules they teach end up. When a lesson generalizes or recurs, the assistant writes the
+rule there and marks the memory file promoted, so the rule is read at every boot instead of
+fading in a dated index. The seed rules cover reporting scope, answering cost questions,
+and re-checking recorded plan steps.
 
 ## Workflow
 
@@ -121,6 +128,7 @@ judgment in front of the model.
 | `resume` | Picking up after a gap or a compaction |
 | `debug` | Something's broken; no phase gates |
 | `update-waypoint` | Updating the installed framework from its source repo |
+| `report` | Writing a status reply you can act on; promoting a lesson from memory into `sop.md` |
 
 Point the assistant at one by name: `Read .waypoint/skills/debug.md and follow it.`
 
@@ -134,7 +142,7 @@ Read .waypoint/skills/update-waypoint.md and follow it.
 
 It finds your Waypoint source (`.waypoint/VERSION` records the repo and commit you
 installed from), reinstalls the framework files, summarizes the changes you're crossing,
-and merges OPORD baseline changes into your extended copy with you reviewing the diff.
+and merges OPORD and SOP baseline changes into your extended copies with you reviewing the diff.
 That last part is the reason it's a skill: merging prose takes judgment a script doesn't
 have.
 
@@ -149,8 +157,8 @@ before this skill existed, run it once; the reinstall lays the skill down:
 - **Framework-owned files are replaced wholesale**: core skills, your editor's adapter,
   the memory README. Skills you wrote yourself are never touched.
 - **Project-owned files are never rewritten**: `project.md`, a written `conops.md`, and
-  an OPORD you've extended. An OPORD you *haven't* extended is fast-forwarded to the new
-  baseline automatically; the installer can prove nothing was lost.
+  an OPORD or SOP you've extended. One you *haven't* extended is fast-forwarded to the
+  new baseline automatically; the installer can prove nothing was lost.
 - **Old layouts are healed.** A legacy single `memory.md` becomes a dated file inside
   `memory/`. A briefing that an old version embedded in your `CLAUDE.md` moves to
   `.claude/rules/waypoint.md`, and the stale block is reported for you to delete.

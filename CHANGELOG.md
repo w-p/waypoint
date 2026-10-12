@@ -9,6 +9,23 @@ affects those, merging is manual.
 
 ---
 
+## 2026-10-12
+
+- **`sop.md`: standing rules distilled from lessons.** A new project-owned document the
+  assistant reads at every boot, between the OPORD and the skills. Memory stays the record
+  of what happened; when a lesson generalizes or recurs, the rule is written into `sop.md`
+  and the memory file is marked `promoted:` on its second line, never deleted. It ships
+  with seed rules on reporting scope, answering cost questions necessity-first, and
+  re-checking recorded plan steps. Installed when absent and fast-forwarded when
+  unextended, exactly like the OPORD; an extended copy is merged by the `update-waypoint`
+  skill. **Extended OPORDs:** merge the new §1 and §3a entries that read `sop.md`, and the
+  two new blocks, **Conversational posture** in §3c and **CCIR and decision points** in §5.
+- **New `report` skill.** Two checklists: how to write a status reply (scope of what was
+  verified, the view you judge by first, action needed before the answer, cost as
+  necessity before size, one assumption back) and how to decide whether a memory entry is
+  an observation or a lesson to promote. The verification steps in `new-feature` and
+  `debug` point at it.
+
 ## 2026-08-31
 
 - **Hooks: the important rules are now delivered and gated, not just written down.**
