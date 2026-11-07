@@ -69,7 +69,7 @@ Present the plan to the developer. Revise until approved. Then ask: "Ready to pr
 
 Work through the plan task by task. For each task:
 
-1. Implement the change
+1. Implement the change, shaped as the `craft` skill describes: look for what already exists before writing, put each value and helper with its owner, share at the second use
 2. Verify it works as specified, and report it as `report` describes — verifying and saying it are two halves of one duty
 3. Note any discovered complexity or necessary deviations from the plan
 

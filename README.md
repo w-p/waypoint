@@ -129,6 +129,7 @@ judgment in front of the model.
 | `debug` | Something's broken; no phase gates |
 | `update-waypoint` | Updating the installed framework from its source repo |
 | `report` | Writing a status reply you can act on; promoting a lesson from memory into `sop.md` |
+| `craft` | Writing or changing code: what to look for before adding anything, where values and helpers belong, when to share or split |
 
 Point the assistant at one by name: `Read .waypoint/skills/debug.md and follow it.`
 

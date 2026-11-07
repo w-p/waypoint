@@ -123,6 +123,10 @@ Build, test, and document according to the plan. All code, configuration, and do
 | Error handling | Never silently discard errors; every error must be handled or explicitly propagated           |
 | Dependencies   | Prefer the standard library; reach for external packages only when the stdlib is insufficient |
 | Comments       | Explain intent and tradeoffs, not mechanics; do not narrate what the code already says        |
+| Reuse          | Before writing a value, helper or name, search for an existing one and use it; the second copy is where drift starts |
+| Placement      | A value or helper lives with the part of the system that knows why it is what it is; everything else references it |
+
+The reasoning behind these, and the questions to work through while shaping code (what already exists, who owns a fact, whether a number is a requirement, when to share, when to split a file), is the `craft` skill. Read it when writing or changing code.
 
 > **Project extension point.** Add language-specific or project-specific standards below this line.
 > Examples: logging library and format conventions, test framework expectations, naming patterns, linting rules.

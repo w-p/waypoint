@@ -123,6 +123,7 @@ exists "$p/.waypoint/skills/new-project.md" "core skills installed"
 exists "$p/.waypoint/skills/update-waypoint.md" "update skill installed"
 exists "$p/.waypoint/sop.md" "SOP installed"
 exists "$p/.waypoint/skills/report.md" "report skill installed"
+exists "$p/.waypoint/skills/craft.md" "craft skill installed"
 exists "$p/.claude/rules/waypoint.md" "Claude adapter installed"
 exists "$p/.waypoint/VERSION" "source revision stamped"
 for d in design plan features skills memory; do

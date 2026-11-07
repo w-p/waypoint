@@ -5,7 +5,7 @@ skills it ships live at the source, in `skills/` at the repository root — read
 there:
 
 `new-project`, `new-feature`, `new-skill`, `onboarding`, `resume`, `debug`,
-`update-waypoint`, `report`
+`update-waypoint`, `report`, `craft`
 
 In a project that has Waypoint installed, those same files are copied into this
 directory and `update` refreshes them. Copying them here would mean maintaining two
