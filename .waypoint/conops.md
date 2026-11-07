@@ -126,6 +126,7 @@ Each of the following activities is covered by a skill document in `.waypoint/sk
 | `resume` | Re-briefing after a session gap, a context compaction, or a long absence |
 | `debug` | Unstructured investigation; lighter weight, no phase gates |
 | `report` | Writing a status reply the developer can act on; deciding whether a memory entry is a lesson to promote into `sop.md` |
+| `craft` | Shaping code so the project stays organized: what to look for before adding anything, where values and helpers belong, when to share or split |
 
 ### 5d. Ongoing duties
 

@@ -38,7 +38,7 @@ ADAPTERS="$ROOT/adapters"
 
 # Core skills shipped by the framework. Install refreshes exactly these;
 # user-authored skills in .waypoint/skills/ are never touched.
-CORE_SKILLS="new-project.md new-feature.md new-skill.md onboarding.md resume.md debug.md update-waypoint.md report.md"
+CORE_SKILLS="new-project.md new-feature.md new-skill.md onboarding.md resume.md debug.md update-waypoint.md report.md craft.md"
 
 # ─── Core ────────────────────────────────────────────────────────────────────
 

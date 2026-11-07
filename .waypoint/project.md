@@ -7,7 +7,7 @@
 - CONOPS (`.waypoint/conops.md`) — project intent, scope, and constraints
 - OPORD baseline (`templates/opord.md`, dogfooded at `.waypoint/opord.md`) — standing orders, phase definitions, rules of engagement, code standards, and the project extension point
 - Templates (`templates/`) — `conops.md` (the eight-section scaffold), `opord.md`, `sop.md`, `project.md`, `memory.md` (the memory folder convention README)
-- Eight core skills (`skills/`) — `new-project`, `new-feature`, `new-skill`, `onboarding`, `resume`, `debug`, `update-waypoint`, `report`
+- Nine core skills (`skills/`) — `new-project`, `new-feature`, `new-skill`, `onboarding`, `resume`, `debug`, `update-waypoint`, `report`, `craft`
 - Two vendor adapters (`adapters/`) — Claude Code (`.claude/rules/waypoint.md`) and Cursor (`.cursor/rules/session-briefing.mdc`), each a standalone rule file installed wholesale
 - Installer (`waypoint`) — a single bash script providing `install-core`, `install-claude`, `install-cursor`, and `update`. Reinstalling is the refresh mechanism: framework-owned files are replaced wholesale, legacy layouts are healed, and a provably unextended OPORD is fast-forwarded to the new baseline. `update` is that reinstall with the adapter detected, and the bootstrap that gets the `update-waypoint` skill into pre-skill projects. Pulls the checkout before installing and stamps `.waypoint/VERSION` with the source commit and `origin:` repo. `update-skills` and `migrate` are stubs
 - Test suite (`test.sh`) — covers `update`'s ownership guarantees, the CONOPS scaffold lifecycle, migration paths, the install guards, and the dogfooding invariant (templates ≡ dogfooded `.waypoint/`)

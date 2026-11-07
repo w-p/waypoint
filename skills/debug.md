@@ -59,7 +59,7 @@ State the root cause clearly: "The bug is X. It is caused by Y. Evidence: Z."
 
 ### Step 5 — Fix and verify
 
-Apply the minimal fix that addresses the root cause. Verify the original behavior is resolved and no new issues are introduced. Report it as `report` describes: verifying and saying it are two halves of one duty.
+Apply the minimal fix that addresses the root cause, shaped as the `craft` skill describes: a fix that copies what already exists, or hides a new literal in a function body, is a second defect. Verify the original behavior is resolved and no new issues are introduced. Report it as `report` describes: verifying and saying it are two halves of one duty.
 
 ### Step 6 — Record findings
 

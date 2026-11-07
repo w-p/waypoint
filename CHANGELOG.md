@@ -9,6 +9,19 @@ affects those, merging is manual.
 
 ---
 
+## 2026-11-07
+
+- **New `craft` skill: how to shape code so the project stays organized.** Read when
+  writing or changing code. It teaches the decisions above the line rather than fixing
+  rules: look for what already exists before writing anything, put each value and helper
+  with the part of the system that knows why it is what it is, name a number only when it
+  is a requirement, share at the second use and not before, treat file size as a signal
+  rather than a limit, follow the direction of dependency, and prefer a failing check to a
+  sentence once a mistake has recurred. It ends with a short pass to run before closing a
+  task. The `new-feature` and `debug` skills point at it from their implementation steps.
+  **Extended OPORDs:** §3e gains two table rows, Reuse and Placement, and one sentence
+  pointing at the skill; merge them by hand or with the update-waypoint skill.
+
 ## 2026-10-12
 
 - **`sop.md`: standing rules distilled from lessons.** A new project-owned document the
