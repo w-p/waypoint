@@ -124,6 +124,9 @@ exists "$p/.waypoint/skills/update-waypoint.md" "update skill installed"
 exists "$p/.waypoint/sop.md" "SOP installed"
 exists "$p/.waypoint/skills/report.md" "report skill installed"
 exists "$p/.waypoint/skills/craft.md" "craft skill installed"
+exists "$p/.waypoint/skills/run-setup.md" "run-setup skill installed"
+exists "$p/.waypoint/skills/run.md" "run skill installed"
+absent "$p/.waypoint/automation.md" "no run-mode policy until the setup interview writes one"
 exists "$p/.claude/rules/waypoint.md" "Claude adapter installed"
 exists "$p/.waypoint/VERSION" "source revision stamped"
 for d in design plan features skills memory; do
@@ -135,6 +138,7 @@ p="$(project cursor)"
 run install-cursor "$p"
 exists "$p/.cursor/rules/session-briefing.mdc" "Cursor adapter installed"
 absent "$p/.claude" "no Claude adapter"
+absent "$p/.waypoint/events" "no events folder without a writer"
 
 start "install-core writes no adapter at all"
 p="$(project core)"
@@ -405,9 +409,32 @@ exists "$p/.claude/settings.json" "settings.json created"
 holds "$p/.claude/settings.json" "waypoint-session-start.sh" "session-start wired"
 if grep -qF "question-gate" "$p/.claude/settings.json"; then no "question gate stays unwired by default"; else ok "question gate stays unwired by default"; fi
 n1="$(grep -c 'waypoint-session-start.sh' "$p/.claude/settings.json")"
+e1="$(grep -c 'waypoint-events.sh' "$p/.claude/settings.json")"
 run install-claude "$p"
 n2="$(grep -c 'waypoint-session-start.sh' "$p/.claude/settings.json")"
-if [ "$n1" = "$n2" ]; then ok "re-wiring is idempotent"; else no "re-wiring is idempotent — $n1 then $n2 entries"; fi
+e2="$(grep -c 'waypoint-events.sh' "$p/.claude/settings.json")"
+if [ "$n1" = "$n2" ] && [ "$e1" = "$e2" ]; then ok "re-wiring is idempotent"; else no "re-wiring is idempotent — $n1/$e1 then $n2/$e2 entries"; fi
+
+start "the session-events hook and the runner are installed"
+for f in hooks/waypoint-events.sh hooks/waypoint_events.py runner/run_chain.sh; do
+	if [ -x "$p/.claude/$f" ]; then ok "$f installed executable"; else no "$f installed executable"; fi
+done
+exists "$p/.claude/runner/run-notify.yml" "the notify workflow ships beside the runner"
+absent "$p/.github" "nothing is written into .github/ by the installer"
+for k in "waypoint-events.sh start" "waypoint-events.sh prompt" "waypoint-events.sh post" "waypoint-events.sh stop" "waypoint-events.sh permission" "waypoint-events.sh end"; do
+	holds "$p/.claude/settings.json" "$k" "wired: $k"
+done
+if [ "$e1" = 7 ]; then ok "seven events entries: start twice (startup, compact), prompt, tool call, stop, permission, end"; else no "seven events entries — found $e1"; fi
+exists "$p/.waypoint/events/.gitignore" "events folder carries its own ignore file"
+git -C "$p" init -q
+mkdir -p "$p/.waypoint/events/sessions" && echo '{}' >"$p/.waypoint/events/sessions/x.jsonl"
+if git -C "$p" status --porcelain --untracked-files=all | grep -q "waypoint/events"; then no "git sees no event files"; else ok "git sees no event files"; fi
+
+start "the runner refuses to start without a policy"
+mkdir -p "$p/.waypoint/plan/runs" && echo "# r" >"$p/.waypoint/plan/runs/r.md"
+out="$(RUNNER_NOTIFY=0 "$p/.claude/runner/run_chain.sh" .waypoint/plan/runs/r.md 1 --out "$TMP/norun" 2>&1)"; rc=$?
+if [ "$rc" = 2 ] && grep -q "^NOPOLICY" "$TMP/norun/done" 2>/dev/null; then ok "NOPOLICY, exit 2, no session"; else no "NOPOLICY, exit 2 — got rc $rc: $out"; fi
+case "$out" in *run-setup.md*) ok "points at the setup interview";; *) no "points at the setup interview";; esac
 
 start "hook wiring merges into existing settings without clobbering"
 p="$(project hookmerge)"
@@ -427,6 +454,32 @@ else
 fi
 
 # ─── Adapter hooks: behavior ─────────────────────────────────────────────────
+
+if command -v python3 >/dev/null 2>&1; then
+	start "the events hook, as installed, records a session and reports its condition"
+	p="$(project events)"
+	run install-claude "$p"
+	git -C "$p" init -q
+	: >"$TMP/transcript.jsonl"
+	hook_in="$(printf '{"session_id":"t1","transcript_path":"%s","cwd":"%s","source":"startup"}' "$TMP/transcript.jsonl" "$p")"
+	out="$(printf '%s' "$hook_in" | CLAUDE_PROJECT_DIR="$p" "$p/.claude/hooks/waypoint-events.sh" start)"
+	if [ -z "$out" ]; then ok "session start says nothing to the session"; else no "session start says nothing to the session"; fi
+	holds "$p/.waypoint/events/sessions/claude-code-t1.jsonl" '"event":"session.started"' "session.started written"
+	out="$(printf '%s' "$hook_in" | CLAUDE_PROJECT_DIR="$p" "$p/.claude/hooks/waypoint-events.sh" prompt)"
+	case "$out" in *'"additionalContext"'*'Session condition: {'*'\"fatigue\": \"fresh\"'*) ok "a prompt gets the condition record";; *) no "a prompt gets the condition record — $out";; esac
+	holds "$p/.waypoint/events/sessions/claude-code-t1.jsonl" '"event":"session.condition"' "session.condition written for readers"
+	out="$(printf 'not json' | CLAUDE_PROJECT_DIR="$p" "$p/.claude/hooks/waypoint-events.sh" prompt)"; rc=$?
+	if [ "$rc" = 0 ] && [ -z "$out" ]; then ok "bad input: exit 0, silent"; else no "bad input: exit 0, silent"; fi
+
+	start "the session condition's stub checks pass"
+	if out="$(python3 "$ROOT/adapters/claude/tests/test_condition.py" 2>&1)"; then ok "$(echo "$out" | tail -1)"; else OUTPUT="$out"; no "test_condition.py — $(echo "$out" | tail -1)"; fi
+
+	start "the runner's stub checks pass (about a minute)"
+	if out="$(bash "$ROOT/adapters/claude/tests/test_run_chain.sh" 2>&1)"; then ok "$(echo "$out" | tail -1)"; else OUTPUT="$out"; no "test_run_chain.sh — $(echo "$out" | tail -1)"; fi
+else
+	start "session events and the runner"
+	ok "skipped — python3 not available"
+fi
 
 start "the session-start hook delivers rules, phase, and boot instruction"
 p="$(project hookrun)"
@@ -537,6 +590,18 @@ git -C "$p" -c user.name=test -c user.email=test@test.invalid commit -qm "seed"
 echo hi >"$p/app.txt"
 out="$(printf '{"status":"completed","loop_count":0}' | (cd "$p" && sh .cursor/hooks/waypoint-stop.sh))"
 if [ "$out" = "{}" ]; then ok "a committed memory entry dated today satisfies the backstop"; else no "a committed memory entry dated today satisfies the backstop"; fi
+
+# ─── Standing rule: Condition ────────────────────────────────────────────────
+
+# The hook gives the session its condition record; the standing rule is what
+# tells it what to do with one. They ship together.
+start "the Condition standing rule rides the composed rule file"
+p="$(project condrule)"
+run install-claude "$p"
+holds "$p/.claude/rules/waypoint.md" "**Condition**" "Condition rule composed into the Claude rule file"
+for v in tiring tired exhausted just_compacted aging stale compaction_possible; do
+	if grep -q "\"$v\"\|'$v'" "$ROOT/adapters/claude/hooks/waypoint_events.py" && region_of "$ROOT/templates/opord.md" | grep -q "\`$v\`"; then ok "'$v' is both written by the hook and named in the rule"; else no "'$v' is both written by the hook and named in the rule"; fi
+done
 
 # ─── Dogfooding invariant ────────────────────────────────────────────────────
 

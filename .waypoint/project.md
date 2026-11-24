@@ -1,13 +1,13 @@
 # Project state
 
-**Phase:** Execution — the standing rules and lessons pipeline (design and plan dated 2026-10-12) is built and uncommitted in the working tree on branch `v2`, on top of the enforcement ladder (2026-08-31), the skill-driven update (2026-08-14) and the boot/memory optimization. All in field testing before merge to main; the next step is to try the SOP in a fresh session and in the downstream project that raised it.
+**Phase:** Execution — run mode, session events and the session condition (design and plan dated 2026-11-23) are built on branch `v2-run-mode` for a pull request against `v2`, brought in from the downstream project that piloted them. `v2` itself holds the craft skill (2026-11-07), the standing rules and lessons pipeline (2026-10-12), the enforcement ladder (2026-08-31), the skill-driven update (2026-08-14) and the boot/memory optimization, all in field testing before merge to main. Next: the developer reviews the pull request, including its proposed CONOPS wording; then the pilot project takes it through `update-waypoint` after its current batch.
 
 **Shipped:**
 
 - CONOPS (`.waypoint/conops.md`) — project intent, scope, and constraints
 - OPORD baseline (`templates/opord.md`, dogfooded at `.waypoint/opord.md`) — standing orders, phase definitions, rules of engagement, code standards, and the project extension point
 - Templates (`templates/`) — `conops.md` (the eight-section scaffold), `opord.md`, `sop.md`, `project.md`, `memory.md` (the memory folder convention README)
-- Nine core skills (`skills/`) — `new-project`, `new-feature`, `new-skill`, `onboarding`, `resume`, `debug`, `update-waypoint`, `report`, `craft`
+- Eleven core skills (`skills/`) — `new-project`, `new-feature`, `new-skill`, `onboarding`, `resume`, `debug`, `update-waypoint`, `report`, `craft`, `run-setup`, `run`
 - Two vendor adapters (`adapters/`) — Claude Code (`.claude/rules/waypoint.md`) and Cursor (`.cursor/rules/session-briefing.mdc`), each a standalone rule file installed wholesale
 - Installer (`waypoint`) — a single bash script providing `install-core`, `install-claude`, `install-cursor`, and `update`. Reinstalling is the refresh mechanism: framework-owned files are replaced wholesale, legacy layouts are healed, and a provably unextended OPORD is fast-forwarded to the new baseline. `update` is that reinstall with the adapter detected, and the bootstrap that gets the `update-waypoint` skill into pre-skill projects. Pulls the checkout before installing and stamps `.waypoint/VERSION` with the source commit and `origin:` repo. `update-skills` and `migrate` are stubs
 - Test suite (`test.sh`) — covers `update`'s ownership guarantees, the CONOPS scaffold lifecycle, migration paths, the install guards, and the dogfooding invariant (templates ≡ dogfooded `.waypoint/`)
@@ -15,6 +15,7 @@
 - Skill-driven update (2026-08-14 design) — the `update-waypoint` core skill: reads `.waypoint/VERSION` (`revision:` plus the new `origin:`), clones or reuses the source, reruns install, narrates the change log, and three-way merges an extended OPORD with the developer reviewing the diff. Install became the refresh mechanism; the standing-checkout requirement retired
 - Enforcement ladder (2026-08-31 design) — every rule at the strongest layer its host can hold. A standing-rules region in the OPORD, composed into both adapter rule files by the installer with a drift test; Claude Code hooks (session-start and post-compaction injection, per-prompt reminder, phase gate on edits and shell writes, block-once memory backstop, opt-in question gate); Cursor hooks (session-start injection, shell gate, edit watcher plus stop follow-up, memory reminder); wiring created/merged/printed, never blind-edited; a §3f Voice section with the register boundary; the machine-read `**Phase:**` line; the README "What's enforced" matrix. `WAYPOINT_PHASE_GATE=off` lifts the gates for a session
 - Standing rules and lessons pipeline (2026-10-12 design) — `sop.md`, a project-owned document of rules distilled from lessons, read every boot after the memory step and owned like the OPORD (installed, fast-forwarded when unextended, merged by `update-waypoint`); the `promoted:` marker on memory files; the `report` skill with its status-reply and lessons checklists; the OPORD's **Conversational posture** (§3c) and **CCIR and decision points** (§5) blocks
+- Run mode, session events and the session condition (2026-11-23 design; on branch `v2-run-mode`, not yet merged) — the `run-setup` and `run` skills; the policy file `.waypoint/automation.md` with one JSON block a runner reads; the session-events contract (`contracts/session-events.md`, version 1); in the Claude Code adapter, the events hook (`waypoint-events.sh`, `waypoint_events.py`) that writes each session's events and gives the session its condition record, the runner (`runner/run_chain.sh`) that chains a runbook's units as fresh scripted sessions, the optional notify workflow, and their stub suites (`adapters/claude/tests/`, run by `test.sh`); the OPORD's **Run mode** paragraph (§3c) and **Condition** standing rule. Known limits in the design's §6: Linux and WSL only, Claude Code only, thresholds from one developer's sessions, no full batch yet run under the policy-reading runner
 - README — what Waypoint is, how to install it, what's enforced, and how to keep it current
 - `CHANGELOG.md` — dated entries, backfilled to the first commit
 
@@ -34,6 +35,7 @@
 - CONOPS revision skill, including how a written CONOPS adopts a changed template (CONOPS §8.3)
 - Framework versioning scheme (CONOPS §8.4) — partially addressed. `.waypoint/VERSION` stamps the source commit and `update` reports the changes it crosses, so a project can now see what moved. Still open: whether Waypoint needs named releases rather than commits, which would only matter if distribution stops being "clone the repo"
 - Skill discoverability mechanism (CONOPS §8.5)
+- Run mode's open items (design 2026-11-23 §6): a Cursor writer and runner; macOS; amending a runbook mid-run as a recorded step; units marked interactive; a token cap that acts during a unit; rules for parallel agents; the memory backstop comparing against the tree at session start
 
 **Ground truth docs**
 
@@ -43,10 +45,12 @@
 - Shipped skills: `skills/` (see `.waypoint/skills/README.md` — this repo is Waypoint itself, so its skills live at the source)
 - Shipped templates: `templates/`
 - Shipped adapters: `adapters/`, one `INSTALL.md` per vendor
+- Session-events contract: `contracts/session-events.md`
 - Installer behavior: `waypoint`
 
 **Plan**
 
+- `.waypoint/plan/2026-11-23-run-mode-and-session-events.md` — the contract, the OPORD edits, the two skills, the Claude Code hook and runner, installer and tests. Executed; on branch `v2-run-mode`.
 - `.waypoint/plan/2026-10-12-standing-rules-and-lessons-pipeline.md` — `sop.md`, the OPORD edits, the `report` skill, the promotion marker, installer ownership. Executed; uncommitted on `v2`.
 - `.waypoint/plan/2026-08-31-enforcement-ladder.md` — standing-rules extraction, adapter hooks for injection and gates on both vendors, the register boundary, the README capability contract. Executed; in the working tree on `v2`.
 - `.waypoint/plan/2026-08-14-skill-driven-update.md` — update becomes a core skill, install becomes the refresh mechanism, VERSION gains `origin:`. Executed; in the working tree on `v2`.

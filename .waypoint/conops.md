@@ -64,7 +64,7 @@ The secondary user is a **new contributor** — human or AI — onboarding to an
 
 ## 4. System Overview
 
-Waypoint lives in a `.waypoint/` directory at the root of the project repository. All framework files are plain Markdown. The core requires no runtime, no tooling installation, and no external service. Vendor adapters may additionally install host-native hooks — small scripts the editor itself runs — to deliver the standing rules and enforce the phase gate; the core never depends on them.
+Waypoint lives in a `.waypoint/` directory at the root of the project repository. All framework files are plain Markdown. The core requires no runtime, no tooling installation, and no external service. Vendor adapters may additionally install host-native hooks — small scripts the editor itself runs — to deliver the standing rules and enforce the phase gate; the core never depends on them. Since 2026-11-23 the Claude Code adapter also carries a writer for the session-events record and a runner for run mode, which need `python3`; the core still needs nothing, and a project that never sets up run mode is unaffected by the runner.
 
 **Directory structure:**
 
@@ -79,6 +79,8 @@ Waypoint lives in a `.waypoint/` directory at the root of the project repository
   plan/             Sequenced work plans
   features/         As-built documentation per shipped feature
   skills/           Entry point guides and reusable domain procedures
+  automation.md     What an unattended chain of sessions may do (present once run mode is set up)
+  events/           Machine-local record of sessions and runs, for readers; never committed
 ```
 
 **Vendor adapters** wire the framework into a specific tool's native mechanisms. Each adapter installs a rule file into the host tool's own rules location (`.claude/rules/waypoint.md` for Claude Code, `.cursor/rules/session-briefing.mdc` for Cursor) and, where the tool has them, hooks: session-start delivery of the standing rules, the phase gate, and the memory reminder. Adapters hold no policy of their own — policy lives in `.waypoint/`, identical regardless of which tool is in use, and the adapter compiles it into whatever the host offers. The installer never blind-edits a project's existing instruction or settings files: wiring is created when absent, merged when that can be done safely, and printed for the developer to apply otherwise.
@@ -127,6 +129,8 @@ Each of the following activities is covered by a skill document in `.waypoint/sk
 | `debug` | Unstructured investigation; lighter weight, no phase gates |
 | `report` | Writing a status reply the developer can act on; deciding whether a memory entry is a lesson to promote into `sop.md` |
 | `craft` | Shaping code so the project stays organized: what to look for before adding anything, where values and helpers belong, when to share or split |
+| `run-setup` | Setting up run mode: the policy for unattended sessions, written by interview and proven by drills |
+| `run` | Running planned, decided work as a chain of fresh sessions |
 
 ### 5d. Ongoing duties
 
@@ -147,13 +151,15 @@ On every new session start, the AI reads `opord.md` first. Its Pre-Action Checkl
 - Core entry point skill documents
 - The baseline OPORD content and its extension mechanism
 - Thin vendor adapters for common AI development tools
+- Run mode (added 2026-11-23): the runbook format, the policy file and the two skills in the core; a runner that chains sessions in an adapter. Limited to work the developer has already decided and approved as a run
+- The session-events contract (added 2026-11-23): the format of the record sessions and runs leave for readers, and the adapter writers that produce it
 
 **Out of scope:**
 
-- Execution mechanics: TDD, test runners, code review workflows, subagent orchestration, git branching strategies, commit conventions
+- Execution mechanics: TDD, test runners, code review workflows, subagent orchestration, git branching strategies, commit conventions. Run mode (in scope above) starts the next session of an approved runbook and nothing more; planning work, dividing it among parallel agents and deciding what a unit does stay out
 - Language, framework, or toolchain opinions
 - CI/CD pipeline configuration
-- Runtime monitoring, alerting, or observability
+- Runtime monitoring, alerting, or observability. Waypoint defines the session-events record and writes it; it ships no reader, viewer or alerting
 - Multi-tenancy, team-level access control, or hosted deployment of any kind
 - Anything outside `.waypoint/`, other than the vendor adapters' own install locations (the host tool's rules and hooks directories and their wiring files)
 - Compatibility with weaker or non-capable AI models (behavior on sub-frontier models is undefined and untested)

@@ -9,6 +9,43 @@ affects those, merging is manual.
 
 ---
 
+## 2026-11-23
+
+- **Run mode: planned, decided work as a chain of fresh sessions.** Two new skills.
+  `run-setup` is a one-time interview that writes `.waypoint/automation.md`, the policy for
+  unattended sessions (quiet windows, hard stops, the session environment, notifications,
+  caps on sessions and tokens), and is not finished until each safeguard has been seen to
+  stop something. `run` covers the rest: the runbook (one table of units, each with an entry
+  condition, a procedure, an exit check and what to report on failure), your approval of a
+  restated scope, launching, and review. A run never improvises; anything unexpected stops
+  the chain and comes back to you.
+- **Claude Code: a session runner.** `.claude/runner/run_chain.sh` starts each unit as a
+  fresh scripted session, waits on builds and quiet windows without spending tokens, and
+  stops on anything but a clean result: a failed gate, a missing memory entry, uncommitted
+  work, a push by a unit not allowed to, a cap, a passed deadline, a failed environment
+  check. It refuses to start until the policy file exists, so installing it changes nothing
+  by itself. Needs `python3` 3.9 or later and GNU coreutils (Linux, WSL). `.claude/runner/
+  run-notify.yml` is an optional GitHub workflow for notifications; the setup skill explains
+  when to copy it into `.github/workflows/`.
+- **Claude Code: each session is told its own condition.** A new hook counts compactions,
+  time since the session last checked the state of the world, and work done since the memory
+  file was written, and gives the session one line of data on every prompt. The new standing
+  rule **Condition** says what to do about each reading: hand over, re-check, or write the
+  memory file now. Name your project's own state command in `.claude/settings.json` so
+  running it counts: `"env": {"WAYPOINT_STATE_CHECK": "<pattern>"}`.
+- **Session events.** The same hook and the runner write a small record of sessions and runs
+  under `.waypoint/events/` for a status view to read: statuses, times and token counts,
+  never prompt text, code or commands. The folder ignores itself in git; your `.gitignore`
+  is not edited. The format is `contracts/session-events.md` in this repository.
+- **By hand:** nothing for a project that only reinstalls. To use run mode, run the setup
+  skill. **Extended OPORDs:** merge the new §1 line for `automation.md`, the **Run mode**
+  paragraph in §3c, and the **Condition** standing rule (the installer then carries the rule
+  into your editor's rule file). **Projects that piloted the runner under another policy
+  shape:** the policy block is JSON, and what the pilot runner hard-coded is now a key
+  (`held_cmd`, `quiet`, `tz`, `env_setup`, `job_exit_dir`, `halt_on_dispatch`,
+  `protected_branch`, `notify`, `commit_suffix`, `unit_rules`); the table in the
+  `run-setup` skill lists them.
+
 ## 2026-11-07
 
 - **New `craft` skill: how to shape code so the project stays organized.** Read when

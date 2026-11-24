@@ -30,7 +30,9 @@ You get `.waypoint/`, one rule file for your editor (`.claude/rules/waypoint.md`
 `.claude/hooks/` or `.cursor/hooks/`, wired through `.claude/settings.json` or
 `.cursor/hooks.json`. The wiring file is created if you don't have one, merged (via
 `jq`) if you do, and printed for you to paste when it can't be merged safely. Your
-existing `CLAUDE.md`, rules, and settings are never blind-edited. Commit all of it.
+existing `CLAUDE.md`, rules, and settings are never blind-edited. The Claude Code adapter
+also installs a session runner in `.claude/runner/` (see [Run mode](#run-mode)); it does
+nothing until you set it up. Commit all of it.
 
 ## Then write your CONOPS
 
@@ -58,6 +60,8 @@ design/       Architecture decisions, written before anything is built
 plan/         Sequenced work, written before anything is built
 features/     As-built docs, written after something ships
 skills/       Procedures the assistant follows for recurring activities
+automation.md What an unattended chain of sessions may do; exists once you set up run mode
+events/       Machine-local record of sessions and runs for a status view; never committed
 ```
 
 `opord.md` is yours once installed — extend it at the marked extension point in §3e with
@@ -100,6 +104,9 @@ Every Waypoint rule lives at the strongest level its host editor can hold:
 | Phase gate on file-writing shell commands | Enforced | Enforced |
 | Memory recorded before the session ends | Enforced, reminds once | Enforced, reminds once |
 | No interactive question prompts | Opt-in hook | not applicable |
+| The session told its own condition (fatigue, drift, unsaved work) on every prompt | Delivered (events hook) | not yet |
+| A record of sessions and runs that a status view can read | Written (events hook, runner) | not yet |
+| A chain of unattended sessions stops at its limits | Enforced by the runner, from your policy | no runner; a supervising session spawns units |
 | Voice, design taste, judgment | Advisory | Advisory |
 
 The phase gates never block writes inside `.waypoint/` — designs, plans, and memory are
@@ -117,6 +124,52 @@ Everything else — when to ask, how designs are judged, how prose reads — is 
 purpose. It's judgment, and the delivered standing rules keep the criteria for that
 judgment in front of the model.
 
+## Run mode
+
+Most work with an assistant is a conversation. Some of it isn't: the design is approved,
+the plan is written, and what remains is a sequence of mechanical steps and machine time. A
+long session sitting through that only accumulates context, and a session's judgment gets
+worse as it does.
+
+Run mode executes that kind of work as a chain of fresh sessions. You write a runbook (one
+table: each unit's entry condition, what to do, the check that proves it finished, what to
+report on failure), the assistant restates its scope, and you say yes. Each unit boots from
+the repository, does its one thing, records it in the run's memory file and exits. Anything
+unexpected stops the chain and comes back to you. A run never improvises.
+
+Two things come first, once per project:
+
+```
+Read .waypoint/skills/run-setup.md and follow it.
+```
+
+That interview writes `.waypoint/automation.md`: quiet windows, hard stops, the session
+environment, how you're notified, and caps on sessions and tokens. It isn't finished until
+each of those has been seen to stop something. The runner refuses to start without it.
+
+With Claude Code the chain is driven by `.claude/runner/run_chain.sh`, which waits on builds
+and quiet windows without spending tokens. It needs `python3` and GNU coreutils, so Linux or
+WSL today. On Cursor the skills and the runbook work the same way with a supervising session
+starting each unit.
+
+**Session condition.** Independently of run mode, the Claude Code adapter tells each session
+how it is doing on every prompt: how many compactions it has been through, how long since it
+last checked the state of the world, how much work would be lost if it stopped now. The
+standing rule **Condition** tells it what to do about each. Thresholds are a first
+calibration from one developer's sessions; they live at the top of
+`.claude/hooks/waypoint_events.py`. If your project has its own "what is true right now"
+command, name it so running it counts as a state check:
+
+```json
+{ "env": { "WAYPOINT_STATE_CHECK": "scripts/state\\.sh|make status" } }
+```
+
+**Session events.** The same hook and the runner write a small record under
+`.waypoint/events/` (statuses, times, token counts; never prompt text, code or commands) so
+a status view can show every session and run on your machine. The format is
+[contracts/session-events.md](contracts/session-events.md). Waypoint ships no viewer;
+[waypoint-ops](https://github.com/w-p/waypoint-ops) is one.
+
 ## Skills
 
 | Skill | Use it when |
@@ -130,6 +183,8 @@ judgment in front of the model.
 | `update-waypoint` | Updating the installed framework from its source repo |
 | `report` | Writing a status reply you can act on; promoting a lesson from memory into `sop.md` |
 | `craft` | Writing or changing code: what to look for before adding anything, where values and helpers belong, when to share or split |
+| `run-setup` | Setting up run mode once per project: the policy for unattended sessions, proven by drills |
+| `run` | Running planned, decided work as a chain of fresh sessions: the runbook, your approval, launch, review |
 
 Point the assistant at one by name: `Read .waypoint/skills/debug.md and follow it.`
 
@@ -155,10 +210,11 @@ before this skill existed, run it once; the reinstall lays the skill down:
   whatever you last happened to fetch. If it has local edits, is on a detached HEAD, has
   no upstream, or you're offline, it says so and carries on with the files on disk.
   `WAYPOINT_NO_PULL=1` skips the pull.
-- **Framework-owned files are replaced wholesale**: core skills, your editor's adapter,
-  the memory README. Skills you wrote yourself are never touched.
-- **Project-owned files are never rewritten**: `project.md`, a written `conops.md`, and
-  an OPORD or SOP you've extended. One you *haven't* extended is fast-forwarded to the
+- **Framework-owned files are replaced wholesale**: core skills, your editor's adapter
+  (rule file, hooks, the session runner), the memory README. Skills you wrote yourself are
+  never touched.
+- **Project-owned files are never rewritten**: `project.md`, a written `conops.md`, your
+  run-mode policy (`automation.md`), and an OPORD or SOP you've extended. One you *haven't* extended is fast-forwarded to the
   new baseline automatically; the installer can prove nothing was lost.
 - **Old layouts are healed.** A legacy single `memory.md` becomes a dated file inside
   `memory/`. A briefing that an old version embedded in your `CLAUDE.md` moves to
@@ -187,6 +243,10 @@ It doesn't touch execution mechanics — no TDD enforcement, no git or branching
 no commit conventions, no CI, no subagent orchestration. It governs what the assistant
 *knows*; tools like [Superpowers](https://github.com/obra/superpowers) govern how it
 *builds*. Run both if you want. Neither knows the other exists.
+
+Run mode is the one place it reaches further, and narrowly: it starts the next session of
+work you have already decided, and stops at anything else. It doesn't plan the work, split
+it among parallel agents, or decide what a unit should do.
 
 It also assumes a frontier model. Behavior on weaker models is untested.
 

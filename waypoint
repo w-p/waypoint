@@ -10,7 +10,7 @@
 #
 # Commands:
 #   install-core     Templates and skills only (no editor adapter)
-#   install-claude   install-core + Claude Code adapter (rule file + hooks)
+#   install-claude   install-core + Claude Code adapter (rule file, hooks, session runner)
 #   install-cursor   install-core + Cursor adapter (rule file + hooks)
 #   update           Adapter-detected reinstall; refreshes the framework files
 #   help             Show this message
@@ -38,7 +38,7 @@ ADAPTERS="$ROOT/adapters"
 
 # Core skills shipped by the framework. Install refreshes exactly these;
 # user-authored skills in .waypoint/skills/ are never touched.
-CORE_SKILLS="new-project.md new-feature.md new-skill.md onboarding.md resume.md debug.md update-waypoint.md report.md craft.md"
+CORE_SKILLS="new-project.md new-feature.md new-skill.md onboarding.md resume.md debug.md update-waypoint.md report.md craft.md run-setup.md run.md"
 
 # ─── Core ────────────────────────────────────────────────────────────────────
 
@@ -162,6 +162,7 @@ install_claude() {
 	echo "  + .claude/rules/waypoint.md"
 	compose_rule_files "$dest"
 	install_claude_hooks "$dest"
+	install_claude_runner "$dest"
 	echo ""
 	echo "✓ Done. In a new Claude Code session: no request → 'Ready.';"
 	echo "  a question → it comes up to speed and answers it."
@@ -265,7 +266,8 @@ compose_rule_files() {
 	fi
 }
 
-# Hook scripts are framework-owned and named waypoint-*.sh, so refreshing them
+# Hook scripts are framework-owned and named waypoint-*.sh (plus waypoint_*.py,
+# the session-events writer the events hook calls), so refreshing them
 # wholesale can never touch a hook the developer wrote. The wiring file is the
 # one file here the project may already own: created when absent, merged with
 # jq when present, and otherwise printed for the developer to paste — never
@@ -274,11 +276,16 @@ install_claude_hooks() {
 	local dest="$1" hooks="$dest/.claude/hooks" settings="$dest/.claude/settings.json"
 	local frag="$ADAPTERS/claude/hooks-settings.json" f tmp
 	mkdir -p "$hooks"
-	for f in "$ADAPTERS"/claude/hooks/waypoint-*.sh; do
+	for f in "$ADAPTERS"/claude/hooks/waypoint-*.sh "$ADAPTERS"/claude/hooks/waypoint_*.py; do
 		cp "$f" "$hooks/$(basename "$f")"
 		chmod +x "$hooks/$(basename "$f")"
 	done
-	echo "  ✓ .claude/hooks/waypoint-*.sh"
+	echo "  ✓ .claude/hooks/waypoint-*.sh, waypoint_events.py"
+	ignore_events "$dest"
+	if ! command -v python3 >/dev/null 2>&1; then
+		echo "  ! python3 not found: the session-events hook will do nothing (no event"
+		echo "    files, no session condition) until it is installed. Everything else works."
+	fi
 	if [ ! -f "$settings" ]; then
 		cp "$frag" "$settings"
 		echo "  + .claude/settings.json  (hook wiring)"
@@ -308,6 +315,34 @@ install_claude_hooks() {
 		echo "    Add this to it by hand:"
 		sed 's/^/      /' "$frag"
 	fi
+}
+
+# Event files (.waypoint/events/) are a machine-local record for readers such
+# as a status view. They are never committed. An ignore file inside the folder
+# covers everything there, itself included, so the project's own .gitignore is
+# never edited.
+ignore_events() {
+	local ev="$1/.waypoint/events"
+	mkdir -p "$ev"
+	if [ ! -f "$ev/.gitignore" ]; then
+		echo '*' >"$ev/.gitignore"
+		echo "  + .waypoint/events/.gitignore  (event files are never committed)"
+	fi
+}
+
+# The session runner chains a runbook's units as fresh scripted sessions (run
+# mode: .waypoint/skills/run.md). Framework-owned, refreshed wholesale. It
+# refuses to start until the project has a policy (.waypoint/automation.md,
+# from the run-setup skill), so installing it changes nothing by itself.
+# run-notify.yml is the GitHub workflow behind issue notifications; the
+# run-setup skill copies it into .github/workflows/ when that channel is chosen.
+install_claude_runner() {
+	local dest="$1" runner="$1/.claude/runner"
+	mkdir -p "$runner"
+	cp "$ADAPTERS/claude/runner/run_chain.sh" "$runner/run_chain.sh"
+	chmod +x "$runner/run_chain.sh"
+	cp "$ADAPTERS/claude/runner/run-notify.yml" "$runner/run-notify.yml"
+	echo "  ✓ .claude/runner/run_chain.sh, run-notify.yml"
 }
 
 install_cursor_hooks() {
