@@ -1,0 +1,43 @@
+name: run notify
+
+# The session runner's notifications (.claude/runner/run_chain.sh; policy .waypoint/automation.md).
+# At every stop and at the end of a chain the runner sends a repository_dispatch of type run-mode;
+# this job opens an issue for it as the Actions bot. Why not let the runner open it directly: the
+# runner runs under the developer's own login, and GitHub never notifies a person of their own
+# actions. The body @-mentions the repository owner, which notifies even when the owner does not
+# watch the repository. A DONE issue is closed at once; the notification has already gone out. A
+# stop stays open until the developer closes it.
+# A repository_dispatch is not a workflow_dispatch, so it does not trip the runner's own halt.
+#
+# Installed by Waypoint at .claude/runner/run-notify.yml; the run-setup skill copies it to
+# .github/workflows/ when the developer chooses GitHub issues as the notification channel. It
+# must be on the default branch to receive the dispatch.
+
+on:
+  repository_dispatch:
+    types: [run-mode]
+
+permissions:
+  issues: write
+
+jobs:
+  notify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: open the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          # Passed through env, never interpolated into the script: the payload is free text.
+          TITLE: ${{ github.event.client_payload.title }}
+          BODY: ${{ github.event.client_payload.body }}
+          CLOSE: ${{ github.event.client_payload.close }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          gh label create run-mode --color 5319E7 --description "session runner stops and run ends" 2>/dev/null || true
+          url="$(gh issue create --title "${TITLE:-Run: (no title)}" --label run-mode --body "$(printf '@%s\n\n%s\n' "$OWNER" "$BODY")")"
+          echo "opened $url"
+          if [ "$CLOSE" = true ]; then
+            gh issue close "$url" --reason completed
+          fi
