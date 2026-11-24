@@ -24,9 +24,10 @@
 # After every unit it:
 #   - reads the session's status line; anything but DONE or WAITING ends the chain (STOPPED)
 #   - checks the unit wrote its memory entry and committed its work
-#   - halts (HALT) on a hard-stop sign: the protected branch on origin moved by a unit not
-#     named in --may-push, or, when the policy asks for it, a workflow_dispatch run created
-#     during the chain
+#   - halts (HALT) on a hard-stop sign: a file that governs the run changed while the unit ran
+#     (the policy, the runbook, .claude's settings, hooks, rules or runner), the protected
+#     branch on origin moved by a unit not named in --may-push, or, when the policy asks for
+#     it, a workflow_dispatch run created during the chain
 #   - appends a ledger line (session id, times, turns, tokens) to the memory file and commits it
 #   - stops if the unit passed the per-unit token cap (CAP)
 #   - waits on a job the unit launched (`WAITING pid <N>`) until that process is gone
@@ -155,43 +156,72 @@ done
 # ones ("22:00-06:00") in the policy's time zone; `held_cmd` is a command that exits 0 while no
 # session may start (a project's own build pauser). RUNNER_NOW ("YYYY-MM-DD HH:MM") is a fake
 # clock for the quiet-window drill.
-in_quiet_window() {   # exit 0 inside a window, 1 outside, 2 when an entry does not parse
+in_quiet_window() {   # exit 0 inside a window, 1 outside; 2, with the reason printed, when it cannot tell
   python3 - "$POLICY" "${RUNNER_NOW:-}" <<'PY'
 import datetime, json, re, sys
-p = json.loads(re.search(r"^```automation\n(.*?)^```", open(sys.argv[1]).read(), re.M | re.S).group(1))
-windows = p.get("quiet") or []
-if sys.argv[2]:
-    t = datetime.datetime.strptime(sys.argv[2], "%Y-%m-%d %H:%M")
-elif p.get("tz"):
-    import zoneinfo
-    t = datetime.datetime.now(zoneinfo.ZoneInfo(p["tz"]))
-else:
-    t = datetime.datetime.now()
-days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
-hit = False
-for w in windows:
-    m = re.fullmatch(r"\s*(?:(\w{3}) )?(\d{1,2}):(\d\d)\s*-\s*(?:(\w{3}) )?(\d{1,2}):(\d\d)\s*", str(w))
-    if not m or bool(m.group(1)) != bool(m.group(4)):
-        sys.exit(2)
-    start = int(m.group(2)) * 60 + int(m.group(3))
-    end = int(m.group(5)) * 60 + int(m.group(6))
-    at = t.hour * 60 + t.minute
-    if m.group(1):                      # a weekly window: minutes since Monday 00:00
-        if m.group(1).lower() not in days or m.group(4).lower() not in days:
-            sys.exit(2)
-        start += days.index(m.group(1).lower()) * 1440
-        end += days.index(m.group(4).lower()) * 1440
-        at += t.weekday() * 1440
-    # A window whose end is not after its start wraps (past midnight, or past Sunday).
-    hit = hit or (start <= at < end if start < end else at >= start or at < end)
-sys.exit(0 if hit else 1)
+
+def refuse(why):
+    print(why)
+    sys.exit(2)
+
+def main():
+    try:
+        block = re.search(r"^```automation\n(.*?)^```", open(sys.argv[1]).read(), re.M | re.S)
+        p = json.loads(block.group(1))
+    except Exception:
+        refuse("its automation block does not parse")
+    # The zone is checked even when the clock is faked or no window is set: `date` falls back
+    # to UTC without a word for a name it does not know, and so would every time in the log.
+    zone = None
+    if p.get("tz"):
+        try:
+            import zoneinfo
+            zone = zoneinfo.ZoneInfo(p["tz"])
+        except Exception:
+            refuse(f"'tz' does not name a time zone this machine knows ({p['tz']!r}; want a name like \"America/New_York\")")
+    if sys.argv[2]:
+        t = datetime.datetime.strptime(sys.argv[2], "%Y-%m-%d %H:%M")
+    else:
+        t = datetime.datetime.now(zone)
+    days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+    hit = False
+    for w in p.get("quiet") or []:
+        unparsed = f"a 'quiet' entry does not parse ({w!r}; want \"Fri 17:00-Sat 03:00\" or \"22:00-06:00\")"
+        m = re.fullmatch(r"\s*(?:(\w{3}) )?(\d{1,2}):(\d\d)\s*-\s*(?:(\w{3}) )?(\d{1,2}):(\d\d)\s*", str(w))
+        if not m or bool(m.group(1)) != bool(m.group(4)):
+            refuse(unparsed)
+        if max(int(m.group(2)), int(m.group(5))) > 23 or max(int(m.group(3)), int(m.group(6))) > 59:
+            refuse(unparsed)
+        start = int(m.group(2)) * 60 + int(m.group(3))
+        end = int(m.group(5)) * 60 + int(m.group(6))
+        at = t.hour * 60 + t.minute
+        if m.group(1):                      # a weekly window: minutes since Monday 00:00
+            if m.group(1).lower() not in days or m.group(4).lower() not in days:
+                refuse(unparsed)
+            start += days.index(m.group(1).lower()) * 1440
+            end += days.index(m.group(4).lower()) * 1440
+            at += t.weekday() * 1440
+        # A window whose end is not after its start wraps (past midnight, or past Sunday).
+        hit = hit or (start <= at < end if start < end else at >= start or at < end)
+    sys.exit(0 if hit else 1)
+
+try:
+    main()
+except Exception as e:      # never let a crash exit 1: that reads as "outside every window"
+    refuse(f"its quiet windows could not be read ({type(e).__name__})")
 PY
 }
-in_quiet_window; [ $? = 2 ] && finish NOPOLICY 2 "policy $POLICY: a 'quiet' entry does not parse (want \"Fri 17:00-Sat 03:00\" or \"22:00-06:00\")"
+quiet() {   # exit 0 inside a quiet window, 1 outside; ends the chain when it cannot tell which
+  local why rc
+  why="$(in_quiet_window)"; rc=$?
+  [ "$rc" -le 1 ] && return "$rc"
+  finish NOPOLICY 2 "policy $POLICY: ${why:-its quiet windows could not be read}"
+}
+quiet   # refuse now, before any session, if the windows or the zone cannot be read
 held() {   # exit 0 while no session may start
   local cmd="${RUNNER_HELD_CMD-$(policy held_cmd "")}"
   if [ -n "$cmd" ] && ( eval "$cmd" ) >/dev/null 2>&1; then return 0; fi
-  in_quiet_window
+  quiet
 }
 not_held() { ! held; }
 
@@ -230,6 +260,26 @@ wait_until() {   # wait_until REASON DESCRIPTION CMD...: poll CMD until it exits
   done
   [ $said = 1 ] && { log "done waiting: $desc"; emit run.resumed reason="$reason"; }
   return 0
+}
+# What governs a run: the policy, the runbook, and the adapter files that decide what a session
+# may do and what runs around it. The developer approved the run under these, so a unit changes
+# none of them, tracked or not. The developer may change them between units (during a wait); the
+# policy is read fresh at every use for that reason.
+GOVERNING_FILES=("$POLICY" "$REPO/$RUNBOOK" "$REPO/.claude/settings.json" "$REPO/.claude/settings.local.json")
+GOVERNING_DIRS=("$REPO/.claude/hooks" "$REPO/.claude/rules" "$REPO/.claude/runner")
+governing() {   # one line per governing file that exists: "<sha256>  <path>"
+  local f
+  for f in "${GOVERNING_FILES[@]}"; do [ -f "$f" ] && sha256sum "$f"; done
+  find "${GOVERNING_DIRS[@]}" -type f -exec sha256sum {} + 2>/dev/null
+  return 0
+}
+governing_changes() {   # governing_changes BEFORE: the files added, removed or changed since, on one line
+  local path
+  comm -3 <(sort <<<"$1") <(governing | sort) | sed 's/^\t//; s/^[0-9a-f]*  //' | sort -u \
+    | while read -r path; do printf '%s ' "${path#"$REPO"/}"; done
+}
+entries() {   # entries UNIT FILE...: how many memory entries for UNIT the files hold (missing files hold none)
+  cat "${@:2}" 2>/dev/null | grep -c -- "-- unit $1:"
 }
 pid_gone() { ! kill -0 "$1" 2>/dev/null; }
 origin_branch() { git ls-remote origin "refs/heads/$PBRANCH" 2>/dev/null | cut -f1; }
@@ -312,7 +362,8 @@ for u in "${UNITS[@]}"; do
   rules="$(policy unit_rules "")"
 
   day0="$(date +%F)"; start="$(now '+%I:%M %p')"
-  head0="$(git rev-parse HEAD)"; origin0="$(origin_branch)"
+  head0="$(git rev-parse HEAD)"; origin0="$(origin_branch)"; governing0="$(governing)"
+  entries0="$(entries "$u" .waypoint/memory/*-"$RUN".md)"
   next_note="the runner starts unit ${UNITS[$i]:-<none: last unit>} next, only on DONE or WAITING pid <N>"
   prompt="You are unit $u of the run .waypoint/plan/runs/$RUN.md ($i of $n_units in this chain), a fresh scripted session in run mode (.waypoint/skills/run.md). The runner .claude/runner/run_chain.sh spawned you; no one reviews between units, and $next_note. The developer approved this run's scope as the runbook's header records it.
 
@@ -320,7 +371,7 @@ First boot per .waypoint/opord.md section 3a, including the most recent memory f
 
 Then do unit $u only: confirm its Entry against artifacts, do its Do column, run its Exit check. Do nothing outside this unit. If anything is unexpected, a check fails, a gate is outside its limit, or a decision is needed that the runbook and its sources do not settle, stop without improvising. Never do anything the policy (.waypoint/automation.md) names as a hard stop: no release, deploy or publication. Push only where the unit says to.${suffix:+ Every commit you make carries $suffix in its subject.}${rules:+ $rules}
 
-Before finishing, append to the memory file dated today, .waypoint/memory/YYYY-MM-DD-$RUN.md (create it if missing, first line a standalone summary of the run): a heading '## <local time> -- unit $u: <unit name>', then one line holding exactly one status (DONE, WAITING pid <N> <job>, BLOCKED <reason>, or FAILED <reason>; a reason is one plain line a person can act on, e.g. 'FAILED integration tests: the staging database refused connections'), then a short note a cold reader can act on (what you verified, with commands and results). The runner adds the ledger line. Commit that entry with the unit's other changes, leaving no tracked file modified. End your reply with the same status line, alone on the last line."
+Before finishing, append to the memory file dated today, .waypoint/memory/YYYY-MM-DD-$RUN.md (create it if missing, first line a standalone summary of the run): a heading '## <local time> -- unit $u: <unit name>', then one line holding exactly one status (DONE, WAITING pid <N> <job>, BLOCKED <reason>, or FAILED <reason>; a reason is one plain line a person can act on, e.g. 'FAILED integration tests: the staging database refused connections'), then a short note a cold reader can act on (what you verified, with commands and results). The runner adds the ledger line. Commit that entry with the unit's other changes, leaving no tracked file modified. End your reply with the same status line, alone on the last line. The runner reads only that line, and DONE stands by itself: if anything is left to say about the result, the status is not DONE."
 
   log "unit $u: session $sessions starting"
   json="$OUT/unit-$u.json"
@@ -343,13 +394,18 @@ try:
     d = json.loads(raw[raw.index("{"):])
 except Exception:
     print("NO_JSON - 0 0 0 0 0 0 0"); sys.exit()
+# Only the reply's last line is judged, as the unit was told to end on its status. A status
+# word further up is the unit talking about its work, and a DONE that goes on to say more
+# ("DONE except the exit check") is not a DONE.
 status = "NO_STATUS"
-for line in reversed((d.get("result") or "").strip().splitlines()):
-    s = line.strip().strip("*`_ ")
-    m = re.match(r"(DONE|WAITING|BLOCKED|FAILED)\b(.*)", s)
-    if m:
-        status = (m.group(1) + m.group(2)).replace(" ", "_")
-        break
+lines = (d.get("result") or "").strip().splitlines()
+last = lines[-1].strip().strip("*`_ ") if lines else ""
+m = re.match(r"(DONE|WAITING|BLOCKED|FAILED)\b(.*)", last)
+if m and m.group(1) == "DONE":
+    if not m.group(2).strip(" .!"):
+        status = "DONE"
+elif m:
+    status = (m.group(1) + m.group(2)).replace(" ", "_")
 u = d.get("usage") or {}
 print(status, d.get("session_id", "-"), d.get("num_turns", 0), round(d.get("duration_ms", 0) / 1000),
       u.get("input_tokens", 0), u.get("cache_creation_input_tokens", 0),
@@ -367,12 +423,15 @@ PY
     tokens:="{\"input\":${tin:-0},\"cache_write\":${tcw:-0},\"cache_read\":${tcr:-0},\"output\":${tout:-0}}" \
     transcript:="{\"path\":\"$utx\",\"format\":\"claude-code-jsonl\"}"
 
-  # The memory entry, and the ledger line under it.
+  # The memory entry, and the ledger line under it. The entry must be new: a chain run again
+  # after a stop finds the earlier attempt's entry for the same unit already in the file.
   mem=""
-  for d in "$day1" "$day0"; do
-    f=".waypoint/memory/$d-$RUN.md"
-    [ -f "$f" ] && grep -q -- "-- unit $u:" "$f" && { mem="$f"; break; }
-  done
+  if (( $(entries "$u" .waypoint/memory/*-"$RUN".md) > entries0 )); then
+    for d in "$day1" "$day0"; do
+      f=".waypoint/memory/$d-$RUN.md"
+      (( $(entries "$u" "$f") > 0 )) && { mem="$f"; break; }
+    done
+  fi
   ledger="Ledger (runner): unit $u session $sid, $start to $end, exit $rc, $turns turns, ${secs}s; tokens: input $tin, cache write $tcw, cache read $tcr, output $tout; permission denials $denials."
   if [ -n "$mem" ]; then
     if git ls-files --error-unmatch "$mem" >/dev/null 2>&1 && git diff --quiet -- "$mem" && git diff --cached --quiet -- "$mem"; then
@@ -388,6 +447,8 @@ PY
   printf 'tokens\t%s\t%s\t%s\n' "$RUN" "$u" "$used" >> "$(today_file)"
 
   # Hard-stop signs, checked before anything else is judged.
+  governed="$(governing_changes "$governing0")"
+  [ -n "$governed" ] && finish HALT 4 "unit $u: files that govern the run changed while it ran: ${governed% } (the policy, the runbook and .claude's settings, hooks, rules and runner change only between units, by the developer); ledger: $ledger"
   if [ "$(policy halt_on_dispatch false)" = true ]; then
     dsp="$(dispatches_since "$CHAIN_START_UTC")"
     [ "$dsp" != 0 ] && finish HALT 4 "unit $u: $dsp workflow_dispatch run(s) created since $CHAIN_START_UTC (or gh failed: '$dsp'); ledger: $ledger"
@@ -397,7 +458,7 @@ PY
     finish HALT 4 "unit $u moved origin/$PBRANCH ${origin0:0:7} -> ${origin1:0:7} and may not push; ledger: $ledger"
   fi
 
-  [ -z "$mem" ] && finish STOPPED 3 "unit $u wrote no memory entry under '-- unit $u:' (status: $status_words); ledger: $ledger"
+  [ -z "$mem" ] && finish STOPPED 3 "unit $u wrote no new memory entry under '-- unit $u:' (status: $status_words); ledger: $ledger"
   git diff --quiet && git diff --cached --quiet \
     || finish STOPPED 3 "unit $u left tracked files modified: $(git diff --name-only HEAD | tr '\n' ' ')"
   tcap_unit="$(policy tokens_per_unit)"
@@ -418,6 +479,7 @@ PY
       [ -n "$JOB_EXIT_DIR" ] && [ -f "$jf" ] && [ "$(stat -c %Y "$jf")" -ge "$job_epoch" ] && jrc="$(tr -dc 0-9 < "$jf")"
       emit job.ended unit="$u" duration_s:="$((SECONDS - t_job))" frozen_s:="$FROZEN_S" ${jrc:+exit_code:="$jrc"}
       [ -n "$jrc" ] && log "unit $u's job exited $jrc" ;;
+    NO_STATUS) finish STOPPED 3 "unit $u: NO STATUS: the reply's last line is not DONE alone or a status with its reason (reply in ${json#"$REPO"/}; memory $mem)" ;;
     *) finish STOPPED 3 "unit $u: $status_words (memory $mem)" ;;
   esac
   log "unit $u: commits ${head0:0:7}..$(git rev-parse --short HEAD)"

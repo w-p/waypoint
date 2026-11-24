@@ -23,7 +23,9 @@ affects those, merging is manual.
   fresh scripted session, waits on builds and quiet windows without spending tokens, and
   stops on anything but a clean result: a failed gate, a missing memory entry, uncommitted
   work, a push by a unit not allowed to, a cap, a passed deadline, a failed environment
-  check. It refuses to start until the policy file exists, so installing it changes nothing
+  check. It also halts when a unit changes a file that governs the run: the policy, the
+  runbook, or `.claude`'s settings, hooks, rules or runner. A unit's status is its reply's
+  last line and nothing else, and `DONE` must stand alone there. It refuses to start until the policy file exists, so installing it changes nothing
   by itself. Needs `python3` 3.9 or later and GNU coreutils (Linux, WSL). `.claude/runner/
   run-notify.yml` is an optional GitHub workflow for notifications; the setup skill explains
   when to copy it into `.github/workflows/`.

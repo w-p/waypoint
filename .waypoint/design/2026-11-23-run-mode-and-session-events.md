@@ -87,6 +87,26 @@ Recorded by the pilot project in its own memory and design files; not re-measure
    every project writes, and the condition record is only useful if the session receives it.
    The hook never fails its session and does nothing without `python3`.
 
+10. **A unit cannot change what governs its run** (added in review, 2026-11-24). The policy
+    is read fresh before every unit so the developer can tighten it mid-run, which also
+    meant a unit could raise its own caps, rewrite a later unit's row or widen its own
+    permissions, report DONE, and be believed. The runner now compares the policy, the
+    runbook and `.claude`'s settings, hooks, rules and runner before and after each unit, by
+    content, so files git ignores count, and halts on any difference. The developer's
+    window for changes is a wait between units. The rest of `.claude/` is left out because
+    the host tool may write there; the user's account-wide settings are outside the
+    repository and are not watched.
+
+11. **When the runner cannot tell, it stops** (added in review, 2026-11-24). Three places
+    read a doubt as a pass. A status word anywhere in the reply counted, so a `DONE` above
+    a closing line that reported a failure advanced the chain; only the last line is read
+    now, and `DONE` must stand alone on it. A time zone the machine did not know crashed
+    the window check, and the crash read as "outside every window"; the runner now refuses
+    to start, or ends the chain if the policy becomes unreadable during a wait. A unit's
+    memory entry was looked for by its heading, which an earlier attempt at the same unit
+    had already written; the entry must now be new. Each is stricter than what the pilot
+    ran, so a run that passed there can stop here.
+
 ## 4. What changed between the pilot and what ships
 
 The pilot's runner named its project's own scripts. Each became a policy key, optional with

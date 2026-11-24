@@ -47,8 +47,9 @@ developer accepts on your word becomes policy.
    runbook says: releases to users or testers, publishing, spending money, deleting data the
    run did not create, rewriting history, anything outside the repository. Name the commands
    and paths, not categories. For each, say which layer stops it: the runner (a push to the
-   protected branch, a dispatched workflow), the host tool's permission layer, or only the
-   unit's own instruction.
+   protected branch, a dispatched workflow, a change to the files that govern the run),
+   the host tool's permission layer, or only the unit's own instruction. The runner's halts
+   come after the fact: they end the chain, they do not undo the action.
 4. **The unattended permission set.** What a scripted session may run without a person. Find
    out where the host tool actually reads these rules (measure it; some settings are read
    only from the user's account-wide file) and say so before writing anything there. Prefer
@@ -107,7 +108,7 @@ The values above are an example, not defaults.
 | `env_setup` | no | Shell run once by the runner to put the toolchain in place (a `PATH` line) |
 | `quiet` | no | Windows when no session starts: weekly (`"Fri 17:00-Sat 03:00"`) or daily (`"22:00-06:00"`) |
 | `held_cmd` | no | A command that exits 0 while no session may start (the project's own pause) |
-| `tz` | no | The time zone for windows, deadlines, the daily tally and logs; default the machine's |
+| `tz` | no | The time zone for windows, deadlines, the daily tally and logs; default the machine's. A name the machine does not know (`"America/New York"`) stops the runner before any session, as does a `quiet` entry it cannot read |
 | `protected_branch` | no | A unit not allowed to push that moves this branch on origin halts the chain; default origin's default branch |
 | `halt_on_dispatch` | no | `true`: a manually dispatched workflow run created during the chain halts it (needs `gh`) |
 | `notify` | no | `none` (default), `github-issue`, or `command` |
@@ -140,6 +141,8 @@ the drill exercised.
   runner halts, and the developer is notified. A unit told to attempt it may decline on its
   own instruction, which drills only that layer; to drill the runner's halt, perform the
   action yourself while a unit runs.
+- **Governing files:** this policy file edited while a unit runs; the runner halts and names
+  it. The control is the same edit made while the chain waits, which halts nothing.
 - **Environment:** the runner started with the toolchain missing; it starts no session.
 - **Caps:** the day's tally set at the cap; the next start is refused.
 - **Deadline**, if used: a runbook line already past; that unit does not start.

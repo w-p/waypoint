@@ -6,6 +6,8 @@
 #   status <line>   the status it reports      mem no     write no memory entry
 #   nocommit        leave the entry uncommitted push      move origin/main
 #   job <secs>      launch a detached sleep and report WAITING pid <N>
+#   sh <command>    run a shell command in the repository before the memory entry
+#   after <line>    a line the reply carries after its status line
 # It records its prompt in $STUBS/prompt-<id> and its --permission-mode in $STUBS/perm.
 # Stub `gh`: reports $GH_DISPATCHES workflow_dispatch runs (or fails if it is "fail"); lists the open
 #   non-runner issues written in $STUBS/issues; records each notification's dispatch in $STUBS/notify.
@@ -37,6 +39,7 @@ if grep -q '^jobrc ' "$spec"; then   # jobrc <secs> <rc>: a job whose wrapper re
   setsid nohup bash -c 'sleep "$1"; mkdir -p "$3"; echo "$2" > "$3/$$"; exit "$2"' _ "$secs" "$code" "$STUB_EXIT_DIR" >/dev/null 2>&1 &
   status="WAITING pid $! build"
 fi
+grep -q '^sh ' "$spec" && eval "$(sed -n 's/^sh //p' "$spec")"
 mem=".waypoint/memory/$(date +%F)-$run.md"
 if ! grep -q '^mem no' "$spec"; then
   mkdir -p .waypoint/memory
@@ -45,7 +48,9 @@ if ! grep -q '^mem no' "$spec"; then
   grep -q '^nocommit' "$spec" || { git add "$mem"; git commit -q -m "unit $u [skip ci]"; }
 fi
 grep -q '^push' "$spec" && git push -q origin HEAD:main
-python3 -c 'import json,sys; print(json.dumps({"result": "work\n" + sys.argv[1], "session_id": sys.argv[3] or "s-" + sys.argv[2], "num_turns": 3, "duration_ms": 1000, "usage": {"input_tokens": 5, "cache_creation_input_tokens": 10, "cache_read_input_tokens": 100, "output_tokens": 7}, "permission_denials": []}))' "$status" "$u" "$sid"
+grep -q '^after ' "$spec" && status="$status
+$(sed -n 's/^after //p' "$spec")"
+python3 -c 'import json,sys; print(json.dumps({"result": "work\n" + sys.argv[1],"session_id": sys.argv[3] or "s-" + sys.argv[2], "num_turns": 3, "duration_ms": 1000, "usage": {"input_tokens": 5, "cache_creation_input_tokens": 10, "cache_read_input_tokens": 100, "output_tokens": 7}, "permission_denials": []}))' "$status" "$u" "$sid"
 STUB
 cat > "$BIN/gh" <<'STUB'
 #!/usr/bin/env bash
@@ -143,7 +148,27 @@ d=$(fresh nostatus); echo "status I think it went fine" > "$d/stubs/unit-1"
 rc=$(go "$d" 1); check "no status line stops the chain" 3 STOPPED "$rc" "$d/out" "NO STATUS"
 
 d=$(fresh nomem); echo "mem no" > "$d/stubs/unit-1"
-rc=$(go "$d" 1); check "a missing memory entry stops the chain" 3 STOPPED "$rc" "$d/out" "wrote no memory entry"
+rc=$(go "$d" 1); check "a missing memory entry stops the chain" 3 STOPPED "$rc" "$d/out" "wrote no new memory entry"
+
+# Only the reply's last line is a status, and a DONE says nothing more.
+d=$(fresh above); printf 'status DONE with step one\nafter Then the exit check failed and I could not finish.\n' > "$d/stubs/unit-1"; touch "$d/stubs/unit-2"
+rc=$(go "$d" 1 2); check "a DONE above a last line that is not a status stops the chain" 3 STOPPED "$rc" "$d/out" "unit 1: NO STATUS"
+d=$(fresh donebut); echo "status DONE except the exit check, which failed" > "$d/stubs/unit-1"; touch "$d/stubs/unit-2"
+rc=$(go "$d" 1 2); check "a last line that says more than DONE stops the chain" 3 STOPPED "$rc" "$d/out" "unit 1: NO STATUS"
+python3 -c "import json,sys; e=[json.loads(l) for l in open(sys.argv[1])]; assert e[2]['status']=='NO_STATUS' and len(e)==4" "$d/out/events.jsonl" \
+  && { echo "PASS it is recorded NO_STATUS and unit 2 never starts"; pass=$((pass+1)); } || { echo "FAIL the DONE-with-more event"; fail=$((fail+1)); }
+d=$(fresh dressed); echo 'status **DONE.**' > "$d/stubs/unit-1"; touch "$d/stubs/unit-2"
+rc=$(go "$d" 1 2); check "a DONE in bold with a full stop is still DONE (control)" 0 DONE "$rc" "$d/out"
+
+# A chain run again the same day finds the first chain's entries in the memory file.
+d=$(fresh again); touch "$d/stubs/unit-1"
+rc=$(go "$d" 1); mv "$d/out" "$d/out1"; echo "mem no" > "$d/stubs/unit-1"
+rc=$(go "$d" 1); check "an earlier chain's entry does not stand in for this unit's" 3 STOPPED "$rc" "$d/out" "wrote no new memory entry"
+d=$(fresh again2); touch "$d/stubs/unit-1"
+rc=$(go "$d" 1); mv "$d/out" "$d/out1"
+rc=$(go "$d" 1); check "a unit run again that writes its entry passes (control)" 0 DONE "$rc" "$d/out"
+n=$(grep -c "^Ledger (runner): unit 1" "$d/repo/.waypoint/memory/$(date +%F)-trun.md")
+[ "$n" = 2 ] && { echo "PASS both attempts have their ledger line"; pass=$((pass+1)); } || { echo "FAIL $n ledger lines after two attempts"; fail=$((fail+1)); }
 
 d=$(fresh nocommit); echo "nocommit" > "$d/stubs/unit-1"
 rc=$(go "$d" 1); check "an uncommitted entry stops the chain" 3 STOPPED "$rc" "$d/out" "uncommitted"
@@ -194,6 +219,21 @@ rc=$(NOW='2026-11-24 12:00' go "$d" 1)
 check "outside the daily window (control) the session starts" 0 DONE "$rc" "$d/out"
 d=$(fresh badquiet); touch "$d/stubs/unit-1"; policy_file "$d/policy.md" 'quiet=["weekends"]'
 rc=$(go "$d" 1); check "a quiet entry that does not parse: the runner refuses" 2 NOPOLICY "$rc" "$d/out" "does not parse"
+d=$(fresh badhour); touch "$d/stubs/unit-1"; policy_file "$d/policy.md" 'quiet=["22:00-26:00"]'
+rc=$(go "$d" 1); check "a quiet entry with an hour past 23: the runner refuses" 2 NOPOLICY "$rc" "$d/out" "does not parse"
+# A zone the machine does not know must not read as "outside every window".
+d=$(fresh badtz); touch "$d/stubs/unit-1"; policy_file "$d/policy.md" 'quiet=["00:00-23:59"]' 'tz="America/New York"'
+rc=$(go "$d" 1); check "a misspelt tz with an all-day window: the runner refuses" 2 NOPOLICY "$rc" "$d/out" "does not name a time zone"
+[ -e "$d/stubs/session-ids" ] && { echo "FAIL a session started under a zone nobody could read"; fail=$((fail+1)); } || { echo "PASS and no session started"; pass=$((pass+1)); }
+d=$(fresh badtz2); touch "$d/stubs/unit-1"; policy_file "$d/policy.md" 'tz="Eastern"'
+rc=$(go "$d" 1); check "a misspelt tz with no window set: the runner still refuses" 2 NOPOLICY "$rc" "$d/out" "does not name a time zone"
+d=$(fresh goodtz); touch "$d/stubs/unit-1"; policy_file "$d/policy.md" 'quiet=["00:00-23:59"]' 'tz="America/New_York"'
+rc=$(RUNNER_MAX_WAIT_SECS=3 go "$d" 1)
+check "the same window with the zone spelt right holds the session (control)" 6 TIMEOUT "$rc" "$d/out" "waiting: the quiet window"
+d=$(fresh midrun); echo "job 3" > "$d/stubs/unit-1"; touch "$d/stubs/unit-2"
+( sleep 1.5; policy_file "$d/policy.md" 'quiet=["weekends"]' ) &
+rc=$(go "$d" 1 2); wait
+check "a window made unreadable during a wait ends the chain before the next unit" 2 NOPOLICY "$rc" "$d/out" "does not parse"
 d=$(fresh heldcmd); touch "$d/stubs/unit-1" "$d/paused"; policy_file "$d/policy.md" "held_cmd=\"test -e $d/paused\""
 rc=$(RUNNER_MAX_WAIT_SECS=3 go "$d" 1)
 check "the policy's pause command holding: no session starts" 6 TIMEOUT "$rc" "$d/out" "waiting: the quiet window"
@@ -212,6 +252,36 @@ d=$(fresh push); echo push > "$d/stubs/unit-1"
 rc=$(go "$d" 1); check "a push by a unit not named in --may-push halts" 4 HALT "$rc" "$d/out" "may not push"
 d=$(fresh push2); echo push > "$d/stubs/unit-1"
 rc=$(go "$d" 1 --may-push 1); check "the same push by a --may-push unit is allowed (control)" 0 DONE "$rc" "$d/out"
+
+# A unit changes none of the files that govern the run. Each case reports DONE and leaves the
+# tree clean, so nothing but this check would stop the chain.
+never_started() {   # never_started NAME DIR UNIT
+  grep -q "unit $3: session" "$2/out/runner.log" && { echo "FAIL $1"; fail=$((fail+1)); } || { echo "PASS $1"; pass=$((pass+1)); }
+}
+d=$(fresh govpolicy); touch "$d/stubs/unit-2"; policy_file "$d/policy.md" sessions_per_day=1
+echo "sh sed -i 's/\"sessions_per_day\": 1,/\"sessions_per_day\": 99,/' \"\$RUNNER_POLICY\"" > "$d/stubs/unit-1"
+rc=$(go "$d" 1 2); check "a unit that raises its own cap in the policy halts" 4 HALT "$rc" "$d/out" "govern the run changed while it ran: $d/policy.md"
+never_started "unit 2 never started under the policy unit 1 wrote" "$d" 2
+d=$(fresh govbook); touch "$d/stubs/unit-2"
+echo "sh echo '| 2 | rewritten |' >> .waypoint/plan/runs/trun.md; git commit -q -m book .waypoint/plan/runs/trun.md" > "$d/stubs/unit-1"
+rc=$(go "$d" 1 2); check "a unit that edits and commits the runbook halts" 4 HALT "$rc" "$d/out" "changed while it ran: .waypoint/plan/runs/trun.md"
+never_started "unit 2 never started from the runbook unit 1 wrote" "$d" 2
+d=$(fresh govlocal); touch "$d/stubs/unit-2"; mkdir -p "$d/repo/.claude"; echo '*.local.json' > "$d/repo/.claude/.gitignore"
+git -C "$d/repo" add .claude/.gitignore; git -C "$d/repo" commit -q -m ignore
+echo "sh echo '{\"permissions\":{\"allow\":[\"Bash\"]}}' > .claude/settings.local.json" > "$d/stubs/unit-1"
+rc=$(go "$d" 1 2); check "a unit that writes a settings file git ignores halts" 4 HALT "$rc" "$d/out" "changed while it ran: .claude/settings.local.json"
+d=$(fresh govhook); mkdir -p "$d/repo/.claude/hooks"; echo 'exit 0' > "$d/repo/.claude/hooks/waypoint-phase-gate.sh"
+git -C "$d/repo" add .claude; git -C "$d/repo" commit -q -m hooks
+echo "sh git rm -q .claude/hooks/waypoint-phase-gate.sh; git commit -q -m gate" > "$d/stubs/unit-1"
+rc=$(go "$d" 1); check "a unit that removes a hook halts" 4 HALT "$rc" "$d/out" "changed while it ran: .claude/hooks/waypoint-phase-gate.sh"
+d=$(fresh govother); mkdir -p "$d/repo/.claude/hooks"; echo 'exit 0' > "$d/repo/.claude/hooks/waypoint-phase-gate.sh"
+git -C "$d/repo" add .claude; git -C "$d/repo" commit -q -m hooks
+echo "sh echo work >> app.txt; git add app.txt; git commit -q -m work" > "$d/stubs/unit-1"; touch "$d/stubs/unit-2"
+rc=$(go "$d" 1 2); check "a unit that changes only its own work passes (control)" 0 DONE "$rc" "$d/out"
+d=$(fresh govwait); echo "job 3" > "$d/stubs/unit-1"; touch "$d/stubs/unit-2"; policy_file "$d/policy.md" sessions_per_day=1
+( sleep 1.5; policy_file "$d/policy.md" sessions_per_day=5 ) &
+rc=$(go "$d" 1 2); wait
+check "the developer's policy edit during a wait takes effect and halts nothing (control)" 0 DONE "$rc" "$d/out"
 
 d=$(fresh cap); touch "$d/stubs/unit-1" "$d/stubs/unit-2"
 rc=$(go "$d" 1 2 --cap 1); check "the session cap stops the chain" 3 CAP "$rc" "$d/out"

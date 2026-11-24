@@ -126,6 +126,12 @@ spending tokens, and stops on anything but `DONE` or `WAITING`. Its folder is
 - **While it runs, nobody else edits this checkout.** The runner stops on any modified
   tracked file after a unit. A supervising session works in a separate worktree, and wakes
   when `done` appears, not on a timer of relayed status.
+- **A unit changes none of the files that govern the run:** the policy, the runbook, and
+  `.claude`'s settings, hooks, rules and runner. The runner compares them before and after
+  each unit, tracked or not, and halts on any difference. You may change them between
+  units, while the chain waits on a job or a quiet window; a change while a unit is running
+  halts the chain, because the runner cannot tell whose it was. Work on those files
+  themselves (reinstalling Waypoint, editing a hook) is not work for a run.
 - **Watch what the project runs on a schedule as well.** A scheduled job failing during a
   run is the run's business; the policy's CI stop exists for it.
 
@@ -157,7 +163,11 @@ A unit's session is told its unit id and the runbook. It:
 | `BLOCKED <reason>` | The unit could not proceed (an entry not met, an action refused) | Ends the chain |
 | `FAILED <reason>` | A check or gate failed | Ends the chain |
 
-A reason is one plain line a person can act on. The runner adds a ledger line under the
+A reason is one plain line a person can act on. The runner reads only the reply's last
+line. `DONE` stands by itself there: a `DONE` that goes on to say more, or a status word
+anywhere above the last line, ends the chain as no status at all. The memory entry must be
+new as well; when a chain is run again after a stop, the earlier attempt's entry for the
+same unit does not count. The runner adds a ledger line under the
 entry (session, times, turns, tokens), which turns the run's estimates into measurements.
 
 ---
